@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+dist/
+
+# Datos (se descargan aparte; ver data/README.md)
+data/olist/*.csv
+data/fashion_mnist/*
+!data/**/.gitkeep
+
+# Modelos entrenados (pesados; se regeneran con ml/)
+backend/app/models/*
+!backend/app/models/.gitkeep
+
+.env
