@@ -7,6 +7,7 @@
     "jsx": "react-jsx",
     "strict": true,
     "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.cache/commerceai.tsbuildinfo",
     "skipLibCheck": true,
     "isolatedModules": true,
     "types": ["vite/client"]

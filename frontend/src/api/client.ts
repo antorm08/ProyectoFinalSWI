@@ -2,10 +2,20 @@
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, init);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, init);
+  } catch (error) {
+    if (init?.signal?.aborted) throw error;
+    throw new Error("No se pudo conectar con la API. Comprueba que el backend esté disponible e inténtalo de nuevo.");
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(typeof body.detail === "string" ? body.detail : `Error ${res.status}`);
+    const detail: unknown = body.detail;
+    const message = typeof detail === "string" ? detail : Array.isArray(detail)
+      ? detail.map((item) => `${Array.isArray(item.loc) ? item.loc.filter((part: unknown) => part !== "body" && part !== "query").join(" · ") : "Campo"}: ${item.msg ?? "Valor no válido"}`).join(". ")
+      : `La API devolvió un error (${res.status}). Inténtalo de nuevo.`;
+    throw new Error(message);
   }
   return res.json() as Promise<T>;
 }
@@ -41,16 +51,16 @@ export interface SummaryOutput { resumen: string; oraciones_originales: number; 
 
 // ---- Endpoints ----
 export const api = {
-  health: () => request<Health>("/health"),
-  predictDelay: (d: DelayInput) => request<DelayOutput>("/delay/predict", json(d)),
-  forecast: (horizonte: number, historico = 90) =>
-    request<DemandOutput>(`/demand/forecast?horizonte=${horizonte}&historico=${historico}`),
-  classifyProduct: (file: File) => {
+  health: (signal?: AbortSignal) => request<Health>("/health", { signal }),
+  predictDelay: (d: DelayInput, signal?: AbortSignal) => request<DelayOutput>("/delay/predict", { ...json(d), signal }),
+  forecast: (horizonte: number, historico = 90, signal?: AbortSignal) =>
+    request<DemandOutput>(`/demand/forecast?horizonte=${horizonte}&historico=${historico}`, { signal }),
+  classifyProduct: (file: File, signal?: AbortSignal) => {
     const fd = new FormData();
     fd.append("imagen", file);
-    return request<ProductOutput>("/products/classify", { method: "POST", body: fd });
+    return request<ProductOutput>("/products/classify", { method: "POST", body: fd, signal });
   },
-  sellers: () => request<SellersOutput>("/sellers/clusters"),
-  summarize: (texto: string, n_oraciones: number) => request<SummaryOutput>("/reviews/summarize", json({ texto, n_oraciones })),
-  summarizeSeller: (id: string, n: number) => request<SummaryOutput>(`/reviews/seller/${id}?n_oraciones=${n}`),
+  sellers: (signal?: AbortSignal) => request<SellersOutput>("/sellers/clusters", { signal }),
+  summarize: (texto: string, n_oraciones: number, signal?: AbortSignal) => request<SummaryOutput>("/reviews/summarize", { ...json({ texto, n_oraciones }), signal }),
+  summarizeSeller: (id: string, n: number, signal?: AbortSignal) => request<SummaryOutput>(`/reviews/seller/${encodeURIComponent(id)}?n_oraciones=${n}`, { signal }),
 };
