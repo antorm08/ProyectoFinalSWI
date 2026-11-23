@@ -27,6 +27,8 @@ def predict(data: DelayInput) -> DelayOutput:
     }])
     row["estado_cliente"] = row["estado_cliente"].str.upper()
     row["estado_vendedor"] = row["estado_vendedor"].str.upper()
+    # Igual que en preparación: cero significa peso desconocido, nunca peso real.
+    row.loc[row["peso_g"].eq(0), "peso_g"] = float("nan")
 
     if model is not None:
         p = float(model.predict_proba(row)[0, 1])
