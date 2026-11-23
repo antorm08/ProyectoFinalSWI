@@ -9,9 +9,10 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.compose import ColumnTransformer
 from sklearn.metrics import silhouette_score
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
 if __package__:
     from .common import MODELS, checked_join, delivered_orders, load, require_unique
@@ -19,7 +20,30 @@ else:
     from common import MODELS, checked_join, delivered_orders, load, require_unique
 
 FEATURES = ["n_pedidos", "facturacion", "nota_media", "tasa_retraso", "dias_entrega_medio"]
+LOG_FEATURES = ["n_pedidos", "facturacion"]
+LINEAR_FEATURES = ["nota_media", "tasa_retraso", "dias_entrega_medio"]
 MIN_PEDIDOS = 5
+
+
+def build_pipeline(k: int, random_state: int = 42) -> Pipeline:
+    """Crea el pipeline con transformación log1p para variables sesgadas y escalamiento."""
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "log_scale",
+                Pipeline([
+                    ("log", FunctionTransformer(np.log1p, validate=False)),
+                    ("scaler", StandardScaler()),
+                ]),
+                LOG_FEATURES,
+            ),
+            ("linear_scale", StandardScaler(), LINEAR_FEATURES),
+        ]
+    )
+    return Pipeline([
+        ("prep", preprocessor),
+        ("km", KMeans(n_clusters=k, n_init=20, random_state=random_state)),
+    ])
 
 
 def seller_order_metrics(orders=None, items=None, reviews=None) -> pd.DataFrame:
@@ -33,7 +57,6 @@ def seller_order_metrics(orders=None, items=None, reviews=None) -> pd.DataFrame:
     require_unique(reviews, ["review_id", "order_id"], "Reseñas")
     if items["seller_id"].isna().any():
         raise ValueError("Ítem sin vendedor")
-    # Verificar referencias antes de filtrar explícitamente por elegibilidad.
     checked_join(items[["order_id"]], source[["order_id"]], "order_id")
     checked_join(reviews[["order_id"]], source[["order_id"]], "order_id")
     items["price"] = pd.to_numeric(items["price"], errors="raise")
@@ -43,12 +66,10 @@ def seller_order_metrics(orders=None, items=None, reviews=None) -> pd.DataFrame:
     if (~reviews["review_score"].between(1, 5) | reviews["review_score"].mod(1).ne(0)).any():
         raise ValueError("Nota de reseña fuera de 1–5 o no entera")
     selected = items.loc[items["order_id"].isin(eligible["order_id"])]
-    # Artículos distintos suman ingresos; no multiplican nota ni entrega.
     pairs = selected.groupby(["seller_id", "order_id"], as_index=False).agg(
         facturacion=("price", "sum"), n_articulos=("order_item_id", "size")
     )
     pairs = checked_join(pairs, eligible[["order_id", "retrasado", "dias_entrega"]], "order_id")
-    # Varias reseñas -> una media por pedido ANTES del join con vendedor-pedido.
     scores = reviews.groupby("order_id", as_index=False).agg(nota=("review_score", "mean"))
     before = len(pairs)
     pairs = pairs.merge(scores, on="order_id", how="left", validate="many_to_one")
@@ -71,7 +92,6 @@ def seller_metrics(orders=None, items=None, reviews=None) -> pd.DataFrame:
         dias_entrega_medio=("dias_entrega", "mean"),
     )
     minimum = metrics["n_pedidos"].ge(MIN_PEDIDOS)
-    # No inventar satisfacción si no existe ninguna reseña de ese vendedor.
     missing = metrics[FEATURES].isna().any(axis=1)
     result = metrics.loc[minimum & ~missing].copy()
     result.attrs["audit"] = {
@@ -83,22 +103,29 @@ def seller_metrics(orders=None, items=None, reviews=None) -> pd.DataFrame:
     return result
 
 
-def label_clusters(centers) -> dict[int, str]:
-    """Pone nombres legibles a los clusters según sus centroides (escala original).
+def label_clusters(centers: pd.DataFrame) -> dict[int, str]:
+    """Asigna etiquetas únicas y accionables según los centroides en escala original."""
+    remaining = set(centers.index)
+    labels: dict[int, str] = {}
 
-    Revisad las etiquetas tras ver los centroides impresos: es un punto de partida.
-    """
-    labels = {}
-    for c, row in centers.iterrows():
-        if row["tasa_retraso"] == centers["tasa_retraso"].max():
-            labels[c] = "Logística problemática"
-        elif row["facturacion"] == centers["facturacion"].max():
-            labels[c] = "Vendedores estrella (alto volumen)"
-        elif row["nota_media"] == centers["nota_media"].min():
-            labels[c] = "Baja satisfacción"
-        else:
-            labels[c] = "Vendedores estables"
-    return {int(k): v for k, v in labels.items()}
+    c_delay = int(centers.loc[list(remaining), "tasa_retraso"].idxmax())
+    labels[c_delay] = "Logística problemática"
+    remaining.remove(c_delay)
+
+    if remaining:
+        c_top = int(centers.loc[list(remaining), "facturacion"].idxmax())
+        labels[c_top] = "Vendedores estrella (alto volumen)"
+        remaining.remove(c_top)
+
+    if remaining:
+        c_low = int(centers.loc[list(remaining), "nota_media"].idxmin())
+        labels[c_low] = "Baja satisfacción"
+        remaining.remove(c_low)
+
+    for c in sorted(remaining):
+        labels[int(c)] = "Vendedores estables"
+
+    return labels
 
 
 def main(check_only=False):
@@ -109,12 +136,12 @@ def main(check_only=False):
     print(f"Vendedores con >= {MIN_PEDIDOS} pedidos: {len(df):,}")
     X = df[FEATURES]
     for k in range(2, 8):
-        p = Pipeline([("scaler", StandardScaler()), ("km", KMeans(k, n_init=10, random_state=42))]).fit(X)
-        print(f"k={k}: silhouette={silhouette_score(p[0].transform(X), p[1].labels_):.3f}")
+        p = build_pipeline(k).fit(X)
+        print(f"k={k}: silhouette={silhouette_score(p['prep'].transform(X), p['km'].labels_):.3f}")
 
-    k = 4  # elegir según el gráfico del codo / silhouette
-    pipe = Pipeline([("scaler", StandardScaler()), ("km", KMeans(k, n_init=10, random_state=42))]).fit(X)
-    df["cluster"] = pipe[1].labels_
+    k = 4
+    pipe = build_pipeline(k).fit(X)
+    df["cluster"] = pipe["km"].labels_
     etiquetas = label_clusters(df.groupby("cluster")[FEATURES].mean())
     df["etiqueta"] = df["cluster"].map(etiquetas)
     print(df.groupby("etiqueta")[FEATURES].mean().round(2))
