@@ -88,8 +88,10 @@ propio pronóstico antes de activarlo (desvío 0,00e+00). Si el artefacto falta 
 un 500**: cae a repetir la última semana y lo declara en pantalla.
 
 **Limitaciones.** Una regla trivial —la media por día de la semana— pronostica mejor que cualquier SARIMA probado
-(0,842 frente a 0,866); no se ha desplegado porque no produce intervalos reconstruibles por el servicio, y darle una
-banda empírica es la primera recomendación de trabajo futuro. Queda autocorrelación significativa en el retardo
+(0,842 frente a 0,866). El banco de dieciocho algoritmos de `docs/algoritmos_demanda.md` confirma que no es casualidad:
+los seis estimadores de perfil semanal baten al modelo activo, con 3 a 4 pedidos/día menos de error y entre mil y mil
+ochocientas veces menos coste, aunque con ocho ventanas de prueba la ventaja no alcanza significación estadística. La
+recomendación es sustituir el pronosticador puntual y conservar la banda calibrada, que es independiente del modelo. Queda autocorrelación significativa en el retardo
 semanal (Ljung-Box p = 0,011), señal de que el término estacional no agota la estructura de la semana. El Black Friday
 de 2017 multiplicó por ocho un día normal y ocurre una sola vez en la serie: la exógena sabe qué día cae, no cuánto
 sube. Análisis completo: `docs/evaluacion_demanda.md`.

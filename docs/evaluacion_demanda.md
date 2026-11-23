@@ -170,7 +170,7 @@ Ljung-Box sobre los residuos del ajuste final: p = 0,011 en el retardo 7, p = 0,
 
 ## 11. Limitaciones
 
-1. **Una regla trivial pronostica mejor.** La media por día de la semana obtiene 0,842 frente al 0,866 del modelo activo. No se ha desplegado porque no produce intervalos que el servicio sepa reconstruir; darle una banda empírica y servirla es la primera recomendación de trabajo futuro.
+1. **Una regla trivial pronostica mejor.** La media por día de la semana obtiene 0,842 frente al 0,866 del modelo activo. No se ha desplegado porque no produce intervalos que el servicio sepa reconstruir; darle una banda empírica y servirla es la primera recomendación de trabajo futuro. **Investigado a fondo en [algoritmos_demanda.md](algoritmos_demanda.md)**: no es un accidente de ese baseline concreto, sino toda una familia de estimadores de perfil semanal que bate al modelo activo —y el 0,842 ni siquiera era su techo, que está en 0,80 con ventanas de 8 a 12 semanas.
 2. **No hay dos ciclos anuales.** La ventana cubre 84 semanas, suficiente para la estacionalidad semanal y no para la anual. De ahí que el horizonte de la API se haya bajado de 180 a 90 días: más allá sería extrapolar sin evidencia.
 3. **El Black Friday no se pronostica.** El 2017-11-24 marcó 1.176 pedidos frente a una mediana diaria de 151,5, casi ocho veces. Ocurre **una sola vez** en la serie: la exógena indica qué día cae, pero no hay forma de estimar cuánto sube con una única observación.
 4. **Queda estructura semanal sin capturar** (§9).
