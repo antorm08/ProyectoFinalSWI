@@ -98,7 +98,9 @@ class Artefacto(unittest.TestCase):
 
     def test_el_artefacto_no_arrastra_el_objeto_de_statsmodels(self):
         bundle = bundle_demo()
-        self.assertEqual(sorted(bundle["spec"]), ["exog", "order", "seasonal_order", "transform"])
+        self.assertEqual(sorted(bundle["spec"]),
+                         ["dias_nivel", "exog", "familia", "order", "seasonal_order",
+                          "semanas_forma", "transform"])
         self.assertIsInstance(bundle["params"], np.ndarray)
         self.assertNotIn("results", bundle)
 
@@ -184,6 +186,113 @@ class BandaCalibrada(unittest.TestCase):
         calibrada = dm.pronosticar(resultados, serie, spec, 14, 0.8, calibracion=calibracion_demo())
         pd.testing.assert_series_equal(teorica["valor"], calibrada["valor"])
         self.assertFalse(np.allclose(teorica["inferior"], calibrada["inferior"]))
+
+
+def bundle_perfil(serie=None, **extra):
+    serie = serie_demo(360) if serie is None else serie
+    spec = dm.Especificacion(familia="perfil", semanas_forma=12, dias_nivel=28)
+    estado = dm.ajustar(serie, spec)
+    return dm.empaquetar(serie, spec, estado, calibracion=calibracion_demo(), **extra)
+
+
+class FamiliaPerfil(unittest.TestCase):
+    """Forma de la semana por nivel reciente: ocho números y ningún optimizador."""
+
+    def setUp(self):
+        self.serie = serie_demo(360)
+        self.spec = dm.Especificacion(familia="perfil", semanas_forma=12, dias_nivel=28)
+
+    def test_el_ajuste_son_siete_factores_de_forma_y_un_nivel(self):
+        estado = dm.ajustar(self.serie, self.spec)
+        self.assertEqual(estado.forma.shape, (7,))
+        self.assertGreater(estado.nivel, 0)
+        self.assertAlmostEqual(float(estado.forma.mean()), 1.0, places=6)
+        self.assertEqual(estado.params.shape, (8,))
+
+    def test_no_tiene_optimizador_que_pueda_no_converger(self):
+        self.assertTrue(dm.convergio(dm.ajustar(self.serie, self.spec)))
+
+    def test_reproduce_una_serie_puramente_semanal(self):
+        patron = [100.0, 120.0, 140.0, 130.0, 160.0, 90.0, 70.0]
+        limpia = pd.Series(patron * 52, index=pd.date_range("2018-01-01", periods=364, freq="D"))
+        estado = dm.ajustar(limpia, self.spec)
+        marco = dm.pronosticar(estado, limpia, self.spec, 7, 0.8, calibracion=calibracion_demo())
+        esperado = [patron[f.day_of_week] for f in marco.index]
+        np.testing.assert_allclose(marco["valor"].to_numpy(), esperado, rtol=1e-9)
+
+    def test_el_nivel_reciente_manda_sobre_la_forma_antigua(self):
+        doblada = self.serie.copy()
+        doblada.iloc[-28:] = doblada.iloc[-28:] * 2
+        base = dm.ajustar(self.serie, self.spec).nivel
+        subido = dm.ajustar(doblada, self.spec).nivel
+        self.assertGreater(subido, base * 1.5)
+
+    def test_sin_calibracion_no_inventa_una_banda(self):
+        estado = dm.ajustar(self.serie, self.spec)
+        with self.assertRaises(dm.BundleIncompatible):
+            dm.pronosticar(estado, self.serie, self.spec, 7, 0.8)
+
+    def test_el_artefacto_sin_calibracion_no_es_servible(self):
+        estado = dm.ajustar(self.serie, self.spec)
+        bundle = dm.empaquetar(self.serie, self.spec, estado, calibracion=calibracion_demo())
+        bundle["calibration"] = None
+        with self.assertRaises(dm.BundleIncompatible):
+            dm.desempaquetar(bundle)
+
+    def test_la_ida_y_vuelta_del_artefacto_es_exacta(self):
+        comprobacion = dm.verificar(bundle_perfil())
+        self.assertEqual(max(comprobacion["desvio_maximo"].values()), 0.0)
+
+    def test_rechaza_parametros_de_otra_familia(self):
+        bundle = bundle_perfil()
+        bundle["params"] = np.arange(5, dtype=float)
+        with self.assertRaises(dm.BundleIncompatible):
+            dm.desempaquetar(bundle)
+
+    def test_rechaza_un_nivel_imposible(self):
+        bundle = bundle_perfil()
+        bundle["params"] = np.concatenate([np.ones(7), [-3.0]])
+        with self.assertRaises(dm.BundleIncompatible):
+            dm.desempaquetar(bundle)
+
+    def test_no_arrastra_columnas_exogenas(self):
+        self.assertEqual(bundle_perfil()["exog_columns"], [])
+
+
+class ApiConPerfil(unittest.TestCase):
+    def setUp(self):
+        self.carpeta = tempfile.TemporaryDirectory()
+        self.ruta = Path(self.carpeta.name) / "demand_model.joblib"
+        joblib.dump(bundle_perfil(metrics={"mae": 40.3, "mase": 1.22, "rel_mae": 0.82,
+                                           "cobertura_80": 0.78, "baseline_mae": 48.7,
+                                           "periodo": "8 ventanas de 28 días"}), self.ruta)
+        self.parche = patch.object(demand_service, "DEMAND_MODEL", self.ruta)
+        self.parche.start()
+        demand_service._cache = None
+
+    def tearDown(self):
+        self.parche.stop()
+        demand_service._cache = None
+        self.carpeta.cleanup()
+
+    def test_la_api_lo_sirve_como_cualquier_otro_modelo(self):
+        estado, cuerpo = get(f"{RUTA}?horizonte=21&historico=30&nivel=0.8")
+        self.assertEqual(estado, 200)
+        self.assertTrue(cuerpo["modelo_entrenado"])
+        self.assertIn("Perfil semanal", cuerpo["modelo"])
+        self.assertIn("banda calibrada", cuerpo["modelo"])
+        futuros = [p for p in cuerpo["serie"] if p["tipo"] == "pronostico"]
+        self.assertEqual(len(futuros), 21)
+        for punto in futuros:
+            self.assertLessEqual(punto["inferior"], punto["valor"])
+            self.assertLessEqual(punto["valor"], punto["superior"])
+            self.assertGreaterEqual(punto["inferior"], 0)
+
+    def test_el_ciclo_semanal_se_repite_en_el_pronostico(self):
+        _, cuerpo = get(f"{RUTA}?horizonte=21")
+        valores = [p["valor"] for p in cuerpo["serie"] if p["tipo"] == "pronostico"]
+        np.testing.assert_allclose(valores[:7], valores[7:14], rtol=1e-6)
+        np.testing.assert_allclose(valores[:7], valores[14:21], rtol=1e-6)
 
 
 class ApiSinModelo(unittest.TestCase):

@@ -31,6 +31,16 @@ PERIODO = 7
 
 TRANSFORMACIONES = ("log1p", "identidad")
 
+#: Familias de modelo que el servicio sabe reconstruir y servir.
+#:
+#: `sarimax` es el modelo de espacio de estados de statsmodels. `perfil` estima
+#: la demanda de cada día como la **forma** de la semana (media por día de la
+#: semana sobre una ventana larga, normalizada) multiplicada por el **nivel**
+#: reciente. El banco de `docs/algoritmos_demanda.md` midió que esa separación
+#: pronostica mejor que cualquier SARIMA probado y cuesta unas mil ochocientas
+#: veces menos; no tiene intervalo teórico, así que exige banda calibrada.
+FAMILIAS = ("sarimax", "perfil")
+
 #: Días por bloque de la calibración empírica de la banda.
 BLOQUE_DIAS = 7
 
@@ -41,23 +51,42 @@ class BundleIncompatible(Exception):
 
 @dataclass(frozen=True)
 class Especificacion:
-    """Todo lo que hace falta para reconstruir el modelo a partir de los parámetros."""
+    """Todo lo que hace falta para reconstruir el modelo a partir de los parámetros.
+
+    Los campos de `order`, `seasonal_order`, `transform` y `exog` solo aplican a
+    la familia `sarimax`; `semanas_forma` y `dias_nivel`, solo a `perfil`.
+    """
+    familia: str = "sarimax"
     order: tuple[int, int, int] = (1, 1, 1)
     seasonal_order: tuple[int, int, int, int] = (1, 0, 1, PERIODO)
     transform: str = "log1p"
     exog: bool = True
+    semanas_forma: int = 12
+    dias_nivel: int = 28
 
     def __post_init__(self) -> None:
-        if self.transform not in TRANSFORMACIONES:
-            raise ValueError(f"Transformación desconocida: {self.transform}")
-        if len(self.order) != 3 or len(self.seasonal_order) != 4:
-            raise ValueError("Órdenes mal formados")
-        if any(v < 0 for v in (*self.order, *self.seasonal_order)):
-            raise ValueError("Los órdenes no pueden ser negativos")
+        if self.familia not in FAMILIAS:
+            raise ValueError(f"Familia desconocida: {self.familia}")
+        if self.familia == "sarimax":
+            if self.transform not in TRANSFORMACIONES:
+                raise ValueError(f"Transformación desconocida: {self.transform}")
+            if len(self.order) != 3 or len(self.seasonal_order) != 4:
+                raise ValueError("Órdenes mal formados")
+            if any(v < 0 for v in (*self.order, *self.seasonal_order)):
+                raise ValueError("Los órdenes no pueden ser negativos")
+        else:
+            if self.semanas_forma < 2 or self.dias_nivel < PERIODO:
+                raise ValueError("El perfil necesita al menos 2 semanas de forma y 7 días de nivel")
 
     @classmethod
     def desde_dict(cls, datos: dict) -> "Especificacion":
+        familia = str(datos.get("familia", "sarimax"))
+        if familia == "perfil":
+            return cls(familia="perfil",
+                       semanas_forma=int(datos["semanas_forma"]),
+                       dias_nivel=int(datos["dias_nivel"]))
         return cls(
+            familia="sarimax",
             order=tuple(datos["order"]),
             seasonal_order=tuple(datos["seasonal_order"]),
             transform=str(datos["transform"]),
@@ -65,10 +94,18 @@ class Especificacion:
         )
 
     def a_dict(self) -> dict:
-        return {**asdict(self), "order": list(self.order), "seasonal_order": list(self.seasonal_order)}
+        if self.familia == "perfil":
+            return {"familia": "perfil", "semanas_forma": self.semanas_forma,
+                    "dias_nivel": self.dias_nivel}
+        return {**asdict(self), "order": list(self.order),
+                "seasonal_order": list(self.seasonal_order),
+                "semanas_forma": self.semanas_forma, "dias_nivel": self.dias_nivel}
 
     @property
     def nombre(self) -> str:
+        if self.familia == "perfil":
+            return (f"Perfil semanal ({self.semanas_forma} semanas) "
+                    f"x nivel ({self.dias_nivel} días)")
         p, d, q = self.order
         P, D, Q, s = self.seasonal_order
         partes = [f"SARIMA({p},{d},{q})({P},{D},{Q})[{s}]"]
@@ -112,6 +149,52 @@ def _exog(index: pd.DatetimeIndex, spec: Especificacion) -> pd.DataFrame | None:
     return calendar_exog(index) if spec.exog else None
 
 
+# --------------------------------------------------------------------------- #
+# Familia `perfil`: forma de la semana por nivel reciente
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class EstadoPerfil:
+    """Ocho números: siete de forma semanal y uno de nivel.
+
+    Eso es todo el modelo. No hay optimizador, ni convergencia que vigilar, ni
+    dependencia de la versión de statsmodels.
+    """
+    forma: np.ndarray
+    nivel: float
+
+    @property
+    def params(self) -> np.ndarray:
+        return np.concatenate([np.asarray(self.forma, dtype=float), [float(self.nivel)]])
+
+
+def _ajustar_perfil(serie: pd.Series, spec: Especificacion) -> EstadoPerfil:
+    largo = serie.iloc[-spec.semanas_forma * PERIODO:]
+    if len(largo) < 2 * PERIODO:
+        raise ValueError("Historia insuficiente para estimar la forma semanal")
+    media_global = float(largo.mean())
+    if not media_global > 0:
+        raise ValueError("La ventana de forma no tiene demanda")
+    por_dia = largo.groupby(largo.index.day_of_week).mean()
+    forma = np.array([float(por_dia.get(dia, media_global)) for dia in range(PERIODO)]) / media_global
+    nivel = float(serie.iloc[-spec.dias_nivel:].mean())
+    return EstadoPerfil(forma=forma, nivel=nivel)
+
+
+def _reconstruir_perfil(params) -> EstadoPerfil:
+    valores = np.asarray(params, dtype=float)
+    if valores.shape != (PERIODO + 1,):
+        raise BundleIncompatible(
+            f"El perfil necesita {PERIODO + 1} parámetros y el artefacto trae {valores.shape}"
+        )
+    if not np.isfinite(valores).all() or valores[-1] <= 0 or (valores[:PERIODO] < 0).any():
+        raise BundleIncompatible("Parámetros de perfil inválidos")
+    return EstadoPerfil(forma=valores[:PERIODO], nivel=float(valores[-1]))
+
+
+def _pronosticar_perfil(estado: EstadoPerfil, futuro: pd.DatetimeIndex) -> np.ndarray:
+    return estado.nivel * estado.forma[futuro.day_of_week.to_numpy()]
+
+
 def construir(serie: pd.Series, spec: Especificacion):
     """Modelo sin ajustar, sobre la serie ya transformada."""
     from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -130,22 +213,31 @@ def construir(serie: pd.Series, spec: Especificacion):
 
 
 def ajustar(serie: pd.Series, spec: Especificacion, maxiter: int = 200):
-    """Optimiza los parámetros. Es la única parte costosa.
+    """Ajusta el modelo. En `sarimax` es la única parte costosa; en `perfil`, inmediata.
 
     Con el `maxiter` por defecto de statsmodels la optimización no converge en
     esta serie. Se sube el límite y la convergencia se consulta con
     `convergio()`, para que un ajuste no convergido no pase inadvertido.
     """
+    if spec.familia == "perfil":
+        return _ajustar_perfil(serie, spec)
     return construir(serie, spec).fit(disp=False, maxiter=maxiter)
 
 
 def convergio(resultados) -> bool:
-    """True si el optimizador declaró convergencia. No es garantía de calidad."""
+    """True si el optimizador declaró convergencia. No es garantía de calidad.
+
+    La familia `perfil` no tiene optimizador: no hay nada que pueda no converger.
+    """
+    if isinstance(resultados, EstadoPerfil):
+        return True
     return bool(getattr(resultados, "mle_retvals", {}).get("converged", False))
 
 
 def reconstruir(serie: pd.Series, spec: Especificacion, params: np.ndarray):
     """Mismo estado que `ajustar`, sin volver a optimizar."""
+    if spec.familia == "perfil":
+        return _reconstruir_perfil(params)
     modelo = construir(serie, spec)
     params = np.asarray(params, dtype=float)
     if params.shape != (len(modelo.param_names),):
@@ -189,6 +281,28 @@ def banda_calibrada(valores: np.ndarray, calibracion: dict, nivel: float):
     return np.maximum(inferior, 0.0), np.maximum(superior, inferior)
 
 
+def _valor_central(resultados, serie: pd.Series, spec: Especificacion, steps: int):
+    """(fechas futuras, valores previstos, salida de statsmodels o None)."""
+    futuro = pd.date_range(serie.index[-1] + pd.Timedelta(days=1), periods=steps, freq="D")
+    if spec.familia == "perfil":
+        return futuro, _pronosticar_perfil(resultados, futuro), None
+    salida = resultados.get_forecast(steps=steps, exog=_exog(futuro, spec))
+    return futuro, destransformar(salida.predicted_mean.to_numpy(), spec.transform), salida
+
+
+def pronostico_puntual(resultados, serie: pd.Series, spec: Especificacion,
+                       steps: int) -> pd.Series:
+    """Solo el valor central, sin banda.
+
+    Lo necesita la calibración, que mide los errores del pronóstico para
+    construir la banda: pedirle banda a esa altura sería circular.
+    """
+    if steps < 1:
+        raise ValueError("steps debe ser al menos 1")
+    futuro, valor, _ = _valor_central(resultados, serie, spec, steps)
+    return pd.Series(valor, index=futuro, name="pronostico")
+
+
 def pronosticar(
     resultados, serie: pd.Series, spec: Especificacion, steps: int, nivel: float = 0.8,
     calibracion: dict | None = None,
@@ -202,11 +316,13 @@ def pronosticar(
         raise ValueError("steps debe ser al menos 1")
     if not 0.5 <= nivel < 1:
         raise ValueError("El nivel de confianza debe estar en [0,5, 1)")
-    futuro = pd.date_range(serie.index[-1] + pd.Timedelta(days=1), periods=steps, freq="D")
-    salida = resultados.get_forecast(steps=steps, exog=_exog(futuro, spec))
-    valor = destransformar(salida.predicted_mean.to_numpy(), spec.transform)
+    futuro, valor, salida = _valor_central(resultados, serie, spec, steps)
     if calibracion:
         inferior, superior = banda_calibrada(valor, calibracion, nivel)
+    elif salida is None:
+        # No hay intervalo teórico que inventar: el perfil es una media
+        # agrupada, no un modelo probabilístico. Sin calibración no hay banda.
+        raise BundleIncompatible("La familia `perfil` requiere banda calibrada")
     else:
         banda = salida.conf_int(alpha=1 - nivel).to_numpy()
         inferior = destransformar(banda[:, 0], spec.transform)
@@ -232,7 +348,8 @@ def empaquetar(serie: pd.Series, spec: Especificacion, resultados,
         "spec": spec.a_dict(),
         "params": np.asarray(resultados.params, dtype=float),
         "history": serie,
-        "exog_columns": list(EXOG_COLUMNAS) if spec.exog else [],
+        "exog_columns": (list(EXOG_COLUMNAS)
+                         if spec.exog and spec.familia == "sarimax" else []),
         "calibration": calibracion,
         "forecast_check": {
             "steps": PERIODO,
@@ -270,7 +387,9 @@ def desempaquetar(bundle: Any) -> tuple[pd.Series, Especificacion, Any]:
             raise BundleIncompatible("La calibración del artefacto está mal formada")
         if any(len(bloque) == 0 for bloque in calibracion["errores_relativos"]):
             raise BundleIncompatible("La calibración trae algún bloque vacío")
-    esperadas = list(EXOG_COLUMNAS) if spec.exog else []
+    if spec.familia == "perfil" and not calibracion:
+        raise BundleIncompatible("Un artefacto de perfil sin calibración no es servible")
+    esperadas = list(EXOG_COLUMNAS) if spec.exog and spec.familia == "sarimax" else []
     if list(bundle["exog_columns"]) != esperadas:
         raise BundleIncompatible(
             f"Columnas exógenas {bundle['exog_columns']!r}; se esperaban {esperadas!r}"
