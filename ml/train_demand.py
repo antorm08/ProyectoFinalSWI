@@ -59,15 +59,20 @@ CODIGO = (
 )
 
 
-def leer_especificacion(ruta: Path) -> tuple[Especificacion, dict]:
-    """Especificación congelada por el experimento, o la de omisión si no hay informe."""
+def leer_seleccion(ruta: Path) -> tuple[Especificacion, dict | None, dict]:
+    """Especificación y calibración congeladas por el experimento.
+
+    Sin informe se usa la especificación por omisión y **sin banda calibrada**,
+    advirtiéndolo: una banda teórica sin medir es justo lo que este componente
+    dejó de publicar.
+    """
     if not Path(ruta).exists():
         spec = Especificacion()
-        return spec, {
+        return spec, None, {
             "origen": "por omisión",
             "advertencia": (
                 f"No se encontró {ruta}. Ejecuta `python -m ml.evaluate_demand` para "
-                "elegir la especificación con evidencia en lugar de heredarla."
+                "elegir la especificación y calibrar la banda con evidencia."
             ),
             "nombre": spec.nombre,
         }
@@ -76,11 +81,15 @@ def leer_especificacion(ruta: Path) -> tuple[Especificacion, dict]:
     if not seleccion.get("spec"):
         raise SystemExit(f"{ruta} no contiene selection.spec; vuelve a lanzar la evaluación")
     spec = Especificacion.desde_dict(seleccion["spec"])
-    return spec, {
+    calibracion = informe.get("calibration")
+    if not calibracion:
+        print("AVISO: el informe no trae calibración; la banda saldrá del intervalo teórico.")
+    return spec, calibracion, {
         "origen": str(ruta.relative_to(ROOT)),
         "ganador": seleccion.get("ganador"),
         "criterio": seleccion.get("criterio"),
         "nombre": spec.nombre,
+        "banda": "calibrada con los errores del backtesting" if calibracion else "teórica",
         "evaluacion_completada": informe.get("completed_at_utc"),
     }
 
@@ -120,7 +129,7 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
         print("\n--check-data: no se entrena ni se escribe nada.")
         return auditoria
 
-    spec, procedencia = leer_especificacion(Path(selection))
+    spec, calibracion, procedencia = leer_seleccion(Path(selection))
     if "advertencia" in procedencia:
         print(f"AVISO: {procedencia['advertencia']}")
     print(f"Especificación ({procedencia['origen']}): {spec.nombre}")
@@ -130,7 +139,7 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         parcial = ajustar(train, spec)
-    pronostico = pronosticar(parcial, train, spec, len(test), NIVEL)
+    pronostico = pronosticar(parcial, train, spec, len(test), NIVEL, calibracion=calibracion)
     pronostico.index = test.index
     base = seasonal_naive(train, len(test))
     base.index = test.index
@@ -159,7 +168,7 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
         print("AVISO: la optimización del modelo final no declaró convergencia.")
 
     bundle = empaquetar(
-        datos, spec, completo,
+        datos, spec, completo, calibracion=calibracion,
         window=auditoria["window"],
         metrics={k: v for k, v in evaluacion.items() if k != "convergio"},
         selection=procedencia,
@@ -191,6 +200,8 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
         "code_sha256": code_hashes(*CODIGO),
         "window": auditoria,
         "specification": {**spec.a_dict(), "nombre": spec.nombre, "procedencia": procedencia},
+        "calibration": ({k: v for k, v in calibracion.items() if k != "errores_relativos"}
+                        if calibracion else None),
         "holdout": evaluacion,
         "artifact": {
             "path": str(output.relative_to(ROOT)),

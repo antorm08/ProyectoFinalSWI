@@ -69,12 +69,23 @@ def parametros(modelo) -> np.ndarray:
     return np.array(valores, dtype=float)
 
 
-def bundle_demo(serie=None, spec=None, **extra):
+def calibracion_demo(bloques=(0.05, 0.15, 0.30), n=41):
+    """Error relativo cada vez más disperso conforme se aleja el horizonte."""
+    return {
+        "metodo": "prueba",
+        "bloque_dias": 7,
+        "horizonte": 21,
+        "origenes": 6,
+        "errores_relativos": [list(np.linspace(-a, a, n)) for a in bloques],
+    }
+
+
+def bundle_demo(serie=None, spec=None, calibracion=None, **extra):
     serie = serie_demo() if serie is None else serie
     spec = spec or dm.Especificacion(order=(1, 0, 0), seasonal_order=(0, 0, 0, 7))
     modelo = dm.construir(serie, spec)
     resultados = modelo.smooth(parametros(modelo))
-    return dm.empaquetar(serie, spec, resultados, **extra)
+    return dm.empaquetar(serie, spec, resultados, calibracion=calibracion, **extra)
 
 
 class Artefacto(unittest.TestCase):
@@ -117,6 +128,62 @@ class Artefacto(unittest.TestCase):
         self.assertTrue((marco["inferior"] >= 0).all())
         self.assertTrue((marco["inferior"] <= marco["valor"]).all())
         self.assertTrue((marco["valor"] <= marco["superior"]).all())
+
+
+class BandaCalibrada(unittest.TestCase):
+    """La banda sale de los errores medidos, no del intervalo teórico."""
+
+    def test_se_ensancha_conforme_se_aleja_el_horizonte(self):
+        valores = np.full(21, 200.0)
+        bajo, alto = dm.banda_calibrada(valores, calibracion_demo(), 0.8)
+        anchuras = [alto[i] - bajo[i] for i in (0, 7, 14)]
+        self.assertEqual(anchuras, sorted(anchuras))
+        self.assertLess(anchuras[0], anchuras[2])
+
+    def test_el_ultimo_bloque_cubre_el_resto_del_horizonte(self):
+        valores = np.full(40, 200.0)
+        bajo, alto = dm.banda_calibrada(valores, calibracion_demo(), 0.8)
+        self.assertEqual(alto[21] - bajo[21], alto[39] - bajo[39])
+        self.assertEqual(alto[14] - bajo[14], alto[39] - bajo[39])
+
+    def test_un_nivel_mayor_da_una_banda_mayor(self):
+        valores = np.full(7, 200.0)
+        estrecha = np.subtract(*reversed(dm.banda_calibrada(valores, calibracion_demo(), 0.8)))
+        ancha = np.subtract(*reversed(dm.banda_calibrada(valores, calibracion_demo(), 0.95)))
+        self.assertTrue((ancha >= estrecha).all())
+
+    def test_escala_con_el_valor_previsto(self):
+        bajo_a, alto_a = dm.banda_calibrada(np.full(7, 100.0), calibracion_demo(), 0.8)
+        bajo_b, alto_b = dm.banda_calibrada(np.full(7, 200.0), calibracion_demo(), 0.8)
+        self.assertAlmostEqual((alto_b[0] - bajo_b[0]) / (alto_a[0] - bajo_a[0]), 2.0)
+
+    def test_nunca_baja_de_cero(self):
+        bajo, _ = dm.banda_calibrada(np.full(7, 3.0), {"bloque_dias": 7,
+                                     "errores_relativos": [[-5.0, -4.0, -3.0]]}, 0.8)
+        self.assertTrue((bajo >= 0).all())
+
+    def test_rechaza_una_calibracion_mal_formada(self):
+        for mala in ({"bloque_dias": 7, "errores_relativos": []},
+                     {"bloque_dias": 7, "errores_relativos": [[]]},
+                     {"bloque_dias": 0, "errores_relativos": [[0.1]]}):
+            with self.assertRaises(dm.BundleIncompatible):
+                dm.banda_calibrada(np.full(3, 10.0), mala, 0.8)
+
+    def test_el_artefacto_rechaza_una_calibracion_invalida(self):
+        bundle = bundle_demo(calibracion=calibracion_demo())
+        bundle["calibration"] = {"bloque_dias": 7, "errores_relativos": [[]]}
+        with self.assertRaises(dm.BundleIncompatible):
+            dm.desempaquetar(bundle)
+
+    def test_la_banda_calibrada_no_es_la_teorica(self):
+        serie = serie_demo()
+        spec = dm.Especificacion(order=(1, 0, 0), seasonal_order=(0, 0, 0, 7))
+        modelo = dm.construir(serie, spec)
+        resultados = modelo.smooth(parametros(modelo))
+        teorica = dm.pronosticar(resultados, serie, spec, 14, 0.8)
+        calibrada = dm.pronosticar(resultados, serie, spec, 14, 0.8, calibracion=calibracion_demo())
+        pd.testing.assert_series_equal(teorica["valor"], calibrada["valor"])
+        self.assertFalse(np.allclose(teorica["inferior"], calibrada["inferior"]))
 
 
 class ApiSinModelo(unittest.TestCase):
@@ -182,6 +249,28 @@ class ApiConModelo(unittest.TestCase):
         self.parche.stop()
         demand_service._cache = None
         self.carpeta.cleanup()
+
+    def test_declara_cuando_la_banda_esta_calibrada(self):
+        # Especificación con diferenciación: el pronóstico mantiene el nivel en
+        # vez de revertir a cero, que es lo que haría con parámetros inventados
+        # y sin diferenciar, dejando la banda relativa sin nada que escalar.
+        nivelada = dm.Especificacion(order=(1, 1, 0), seasonal_order=(0, 0, 0, 7),
+                                     transform="identidad")
+        joblib.dump(bundle_demo(spec=nivelada, calibracion=calibracion_demo()), self.ruta)
+        demand_service._cache = None
+        _, cuerpo = get(f"{RUTA}?horizonte=14")
+        self.assertIn("banda calibrada", cuerpo["modelo"])
+        futuros = [p for p in cuerpo["serie"] if p["tipo"] == "pronostico"]
+        # La banda es relativa al pronóstico: lo que crece con el horizonte es
+        # su anchura en proporción, que es el cuantil de error de cada bloque.
+        relativa = [(p["superior"] - p["inferior"]) / max(p["valor"], 1e-9) for p in futuros]
+        self.assertLess(relativa[0], relativa[-1])
+        # Mismo bloque, misma anchura relativa (el servicio redondea a dos decimales).
+        self.assertAlmostEqual(relativa[0], relativa[6], places=3)
+
+    def test_sin_calibracion_no_lo_declara(self):
+        _, cuerpo = get(f"{RUTA}?horizonte=7")
+        self.assertNotIn("banda calibrada", cuerpo["modelo"])
 
     def test_publica_la_banda_las_metricas_y_el_ancla(self):
         estado, cuerpo = get(f"{RUTA}?horizonte=21&historico=40&nivel=0.8")

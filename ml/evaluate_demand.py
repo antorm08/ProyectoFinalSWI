@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import time
 import warnings
 from pathlib import Path
@@ -49,7 +50,9 @@ else:
         seasonal_naive, versiones, weekday_mean,
     )
 
-from app.services.demand_model import Especificacion, ajustar, convergio, pronosticar
+from app.services.demand_model import (
+    BLOQUE_DIAS, Especificacion, ajustar, convergio, pronosticar,
+)
 
 DEFAULT_OUTPUT = ROOT / "docs" / "resultados_demanda"
 HORIZONTE = 28
@@ -60,7 +63,10 @@ BASELINE = "naive_estacional"
 
 #: Candidatos que el backend sabe reconstruir y servir con banda. El artefacto
 #: sale de aquí: un modelo sin intervalos no puede cumplir el contrato de la API.
-SERVIBLES = ("sarima_heredado", "sarimax_log_calendario")
+SERVIBLES = ("sarima_heredado", "sarimax_elegido")
+
+#: Protocolo de calibración de la banda: horizonte completo de la API.
+CALIBRACION = {"horizonte": 90, "n_origenes": 6, "paso": 28}
 
 #: Criterio de aceptación, al estilo de TARGET_ACCURACY en ml/train_products.py.
 OBJETIVO_REL_MAE = 1.0            # el modelo debe batir a repetir la última semana
@@ -226,18 +232,25 @@ def elegir_orden(particiones, *, rapido: bool = False, por_familia: int = 3) -> 
     evaluables = [f for f in finalistas if "rel_mae" in f and np.isfinite(f["rel_mae"])]
     if not evaluables:
         raise RuntimeError("Ningún finalista se pudo evaluar en los orígenes de desarrollo")
+    # La banda del artefacto se calibra después con los errores del backtesting,
+    # así que aquí decide la precisión del pronóstico. La cobertura teórica de
+    # cada finalista se conserva como diagnóstico: es la que resultó estar mal.
     calibrados = [f for f in evaluables
                   if f["cobertura"] is not None
                   and OBJETIVO_COBERTURA_80[0] <= f["cobertura"] <= OBJETIVO_COBERTURA_80[1]]
-    mejor = min(calibrados or evaluables, key=lambda f: f["rel_mae"])
+    mejor = min(evaluables, key=lambda f: f["rel_mae"])
     mejor_aic = min((i for i in rejilla if "aic" in i), key=lambda i: i["aic"])
     spec = Especificacion(order=tuple(mejor["order"]), seasonal_order=tuple(mejor["seasonal_order"]),
                           transform=mejor["transform"], exog=mejor["exog"])
     detalle = {
         "criterio": (
             "el AIC filtra dentro de cada familia (escala x exógenas) y el backtesting decide "
-            "entre ellas: menor MAE relativo al naive estacional, exigiendo primero que la "
-            "cobertura de la banda del 80 % caiga en el rango objetivo"
+            "entre ellas por menor MAE relativo al naive estacional; la banda no entra en la "
+            "decisión porque se calibra después con los errores observados"
+        ),
+        "cobertura_teorica_es_diagnostico": (
+            "la columna de cobertura de los finalistas es la del intervalo teórico de "
+            "statsmodels, que es justamente el que se descarta"
         ),
         "familias": [{"transform": t, "exog": e} for t, e in familias],
         "contraste_diferenciacion": contraste,
@@ -316,6 +329,60 @@ def coberturas_por_nivel(ejecutar, particiones) -> dict:
                 "origenes": len(observadas),
             }
     return salida
+
+
+def calibrar(spec: Especificacion, serie: pd.Series, *, horizonte: int, n_origenes: int,
+             paso: int, holdout: int, bloque: int = BLOQUE_DIAS) -> dict:
+    """Errores relativos del backtesting, agrupados por bloque del horizonte.
+
+    Se calibra sobre el **horizonte completo que ofrece la API** (90 días), no
+    sobre los 28 del protocolo de comparación: de otro modo la banda de los
+    días lejanos se quedaría sin evidencia y habría que inventarla.
+
+    La cobertura que esto produce en los propios orígenes de desarrollo es
+    circular por construcción. La cifra que vale es la del holdout final, donde
+    la calibración viene de datos que ese tramo no vio.
+    """
+    particiones = rolling_origin(serie, n_origenes=n_origenes, horizonte=horizonte,
+                                 paso=paso, holdout=holdout)
+    n_bloques = math.ceil(horizonte / bloque)
+    errores: list[list[float]] = [[] for _ in range(n_bloques)]
+    suelo = 0
+    for train, test in particiones:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            resultados = ajustar(train, spec)
+        marco = pronosticar(resultados, train, spec, len(test), 0.8)
+        marco.index = test.index
+        previsto = marco["valor"].to_numpy(dtype=float)
+        suelo += int((previsto < 1).sum())
+        relativo = (test.to_numpy(dtype=float) - previsto) / np.maximum(previsto, 1.0)
+        for paso_h, error in enumerate(relativo):
+            errores[min(paso_h // bloque, n_bloques - 1)].append(float(error))
+    resumen = [
+        {
+            "bloque": indice + 1,
+            "dias": f"{indice * bloque + 1}-{min((indice + 1) * bloque, horizonte)}",
+            "n": len(muestra),
+            "q10": round(float(np.quantile(muestra, 0.1)), 4),
+            "q90": round(float(np.quantile(muestra, 0.9)), 4),
+            "mediana": round(float(np.quantile(muestra, 0.5)), 4),
+        }
+        for indice, muestra in enumerate(errores)
+    ]
+    return {
+        "metodo": ("cuantiles empíricos del error relativo del backtesting, "
+                   "por bloque del horizonte"),
+        "bloque_dias": bloque,
+        "horizonte": horizonte,
+        "origenes": len(particiones),
+        "paso_dias": paso,
+        "primer_origen": str(particiones[0][1].index[0].date()),
+        "ultimo_origen": str(particiones[-1][1].index[0].date()),
+        "previstos_bajo_el_suelo": suelo,
+        "resumen_por_bloque": resumen,
+        "errores_relativos": errores,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -423,7 +490,7 @@ def run(output: Path, *, rapido: bool = False) -> dict:
         "media_dia_semana": candidato_dia_semana,
         "ets_semanal": candidato_ets,
         "sarima_heredado": candidato_sarimax(SPEC_HEREDADA),
-        "sarimax_log_calendario": candidato_sarimax(spec),
+        "sarimax_elegido": candidato_sarimax(spec),
     }
 
     resumen = {}
@@ -444,9 +511,28 @@ def run(output: Path, *, rapido: bool = False) -> dict:
     ejecutar_ganador = candidatos[ganador]
     cobertura = coberturas_por_nivel(ejecutar_ganador, particiones)
 
+    spec_ganadora = spec if ganador == "sarimax_elegido" else SPEC_HEREDADA
+    print(f"Calibrando la banda del ganador sobre {CALIBRACION['horizonte']} días…")
+    calibracion = calibrar(spec_ganadora, datos, holdout=horizonte, **CALIBRACION)
+    print(f"  {calibracion['origenes']} orígenes, "
+          f"{len(calibracion['errores_relativos'])} bloques; error relativo "
+          f"días 1-7 [{calibracion['resumen_por_bloque'][0]['q10']:+.3f}, "
+          f"{calibracion['resumen_por_bloque'][0]['q90']:+.3f}] → "
+          f"días {calibracion['resumen_por_bloque'][-1]['dias']} "
+          f"[{calibracion['resumen_por_bloque'][-1]['q10']:+.3f}, "
+          f"{calibracion['resumen_por_bloque'][-1]['q90']:+.3f}]")
+
+    # Holdout final: una sola vez, con el modelo congelado y la banda calibrada
+    # con datos que este tramo no vio.
     train_final, test_final = final_holdout(datos, holdout=horizonte)
-    marco_final, extra_final = ejecutar_ganador(train_final, len(test_final), 0.8)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ajuste_final = ajustar(train_final, spec_ganadora)
+    marco_final = pronosticar(ajuste_final, train_final, spec_ganadora, len(test_final), 0.8,
+                              calibracion=calibracion)
     marco_final.index = test_final.index
+    teorico = pronosticar(ajuste_final, train_final, spec_ganadora, len(test_final), 0.8)
+    teorico.index = test_final.index
     base_final = seasonal_naive(train_final, len(test_final))
     base_final.index = test_final.index
     final = {
@@ -455,16 +541,18 @@ def run(output: Path, *, rapido: bool = False) -> dict:
         "rel_mae": rel_mae(test_final, marco_final["valor"], train_final),
         "periodo": f"{test_final.index[0].date()} a {test_final.index[-1].date()}",
         "baseline_mae": metrics(test_final, base_final)["mae"],
-        **extra_final,
+        "aic": float(ajuste_final.aic),
+        "convergio": convergio(ajuste_final),
+        "cobertura_80": coverage(test_final, marco_final["inferior"], marco_final["superior"]),
+        "cobertura_80_teorica": coverage(test_final, teorico["inferior"], teorico["superior"]),
+        "banda_media": float((marco_final["superior"] - marco_final["inferior"]).mean()),
+        "banda_media_teorica": float((teorico["superior"] - teorico["inferior"]).mean()),
     }
-    if "inferior" in marco_final:
-        final["cobertura_80"] = coverage(test_final, marco_final["inferior"], marco_final["superior"])
+    print(f"  cobertura del 80 %: calibrada {final['cobertura_80']:.3f} "
+          f"frente a teórica {final['cobertura_80_teorica']:.3f}")
     print(f"Holdout final ({final['periodo']}): MAE {final['mae']:.2f} "
           f"relMAE {final['rel_mae']:.3f}")
 
-    spec_ganadora = spec if ganador == "sarimax_log_calendario" else (
-        SPEC_HEREDADA if ganador == "sarima_heredado" else None
-    )
     residuos = {"cobertura": cobertura}
     if spec_ganadora is not None:
         with warnings.catch_warnings():
@@ -548,6 +636,7 @@ def run(output: Path, *, rapido: bool = False) -> dict:
             ),
         },
         "interval_coverage": cobertura,
+        "calibration": calibracion,
         "residual_diagnostics": residuos["ljung_box"],
         "final_holdout": final,
         "acceptance": aceptacion,

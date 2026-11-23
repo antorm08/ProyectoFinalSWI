@@ -53,8 +53,11 @@ def _modelo():
     try:
         bundle = joblib.load(DEMAND_MODEL)
         serie, spec, resultados = desempaquetar(bundle)
-        cargado = (serie, spec, resultados,
-                   {"window": bundle.get("window"), "metrics": bundle.get("metrics") or {}})
+        cargado = (serie, spec, resultados, {
+            "window": bundle.get("window"),
+            "metrics": bundle.get("metrics") or {},
+            "calibration": bundle.get("calibration"),
+        })
     except BundleIncompatible as error:
         log.warning("Artefacto de demanda inservible (%s); se usa el modo provisional", error)
         _cache = (huella, None)
@@ -152,7 +155,8 @@ def forecast(horizonte: int, ventana_historico: int = 90, nivel: float = 0.8) ->
     historico, spec, resultados, meta = cargado
     historico, resultados = _al_dia(historico, resultados, spec, historico.index[-1])
     try:
-        marco = pronosticar(resultados, historico, spec, horizonte, nivel)
+        marco = pronosticar(resultados, historico, spec, horizonte, nivel,
+                            calibracion=meta["calibration"])
     except Exception as error:
         log.warning("El modelo de demanda no pudo pronosticar (%s)", error)
         return forecast_provisional(horizonte, ventana_historico, historico)
@@ -168,7 +172,7 @@ def forecast(horizonte: int, ventana_historico: int = 90, nivel: float = 0.8) ->
     return DemandOutput(
         serie=serie,
         modelo_entrenado=True,
-        modelo=spec.nombre,
+        modelo=spec.nombre + (" · banda calibrada" if meta["calibration"] else ""),
         nivel_confianza=nivel,
         ancla=f"{historico.index[-1]:%Y-%m-%d}",
         ventana=meta["window"],
