@@ -5,7 +5,7 @@ Plataforma web para analizar pedidos, entregas y satisfacción de clientes con 5
 | # | Componente (enunciado) | Problema real | Técnica | Datos |
 |---|---|---|---|---|
 | 1 | Predicción | Riesgo de retraso de un pedido | Gradient Boosting (scikit-learn) | Olist |
-| 2 | Series temporales | Demanda diaria de pedidos | SARIMA (statsmodels) | Olist |
+| 2 | Series temporales | Demanda diaria de pedidos | SARIMAX con calendario + banda calibrada (statsmodels) | Olist |
 | 3 | Clasificación de imágenes | Categorizar productos por foto | CNN (PyTorch) | Fashion-MNIST |
 | 4 | Clustering | Segmentar vendedores por desempeño | K-Means (scikit-learn) | Olist |
 | 5 | Resumen de texto | Resumir opiniones y reclamos | TextRank extractivo | Olist (reseñas) |
@@ -65,7 +65,8 @@ uvicorn app.main:app --reload     # http://localhost:8000/docs
 # 2) Entrenar modelos (con el venv activo, tras descargar los datos: ver data/README.md)
 cd ../ml
 python train_delay.py
-python train_demand.py
+python -m ml.evaluate_demand   # desde la raíz: compara candidatos y calibra la banda
+python -m ml.train_demand      # desde la raíz: entrena el artefacto de demanda
 python train_products.py
 python train_sellers.py
 
