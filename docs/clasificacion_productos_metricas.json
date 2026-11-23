@@ -1,0 +1,411 @@
+{
+  "started_at_utc": "2026-11-23T16:26:54.031359+00:00",
+  "finished_at_utc": "2026-11-23T16:41:59.043652+00:00",
+  "protocol": {
+    "dataset": "Fashion-MNIST (torchvision)",
+    "seed": 42,
+    "threads": 6,
+    "split": {
+      "train": 54000,
+      "validation": 6000,
+      "test": 10000,
+      "validation_stratified": true,
+      "subset": 0
+    },
+    "selection": "mejor accuracy de validación; test evaluado una sola vez",
+    "parameters": {
+      "epochs_max": 20,
+      "patience": 4,
+      "batch_size": 128,
+      "lr": 0.001,
+      "optimizer": "Adam",
+      "scheduler": "ReduceLROnPlateau(max, factor=0.5, patience=1)"
+    },
+    "augmentation": [
+      "RandomHorizontalFlip",
+      "RandomAffine(translate=0.08, scale=0.9-1.1)"
+    ],
+    "normalization": {
+      "mean": 0.286,
+      "std": 0.353
+    },
+    "architecture": "Conv(32)-BN-ReLU-Pool, Conv(64)-BN-ReLU-Pool, Dropout(0.3), FC(128), FC(10)",
+    "parameters_count": 421834,
+    "torch": "2.15.0+cpu"
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.58893,
+      "val_loss": 0.37151,
+      "val_accuracy": 0.85933,
+      "lr": 0.001,
+      "seconds": 39.6
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.42744,
+      "val_loss": 0.30055,
+      "val_accuracy": 0.891,
+      "lr": 0.001,
+      "seconds": 43.3
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.38182,
+      "val_loss": 0.26116,
+      "val_accuracy": 0.90167,
+      "lr": 0.001,
+      "seconds": 41.2
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.35655,
+      "val_loss": 0.25716,
+      "val_accuracy": 0.90167,
+      "lr": 0.001,
+      "seconds": 45.3
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.33405,
+      "val_loss": 0.2499,
+      "val_accuracy": 0.90567,
+      "lr": 0.001,
+      "seconds": 43.3
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.32207,
+      "val_loss": 0.24231,
+      "val_accuracy": 0.91033,
+      "lr": 0.001,
+      "seconds": 45.1
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.30896,
+      "val_loss": 0.25494,
+      "val_accuracy": 0.90367,
+      "lr": 0.001,
+      "seconds": 44.8
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.29965,
+      "val_loss": 0.22839,
+      "val_accuracy": 0.9165,
+      "lr": 0.001,
+      "seconds": 43.4
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.29086,
+      "val_loss": 0.22223,
+      "val_accuracy": 0.91783,
+      "lr": 0.001,
+      "seconds": 49.3
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.28311,
+      "val_loss": 0.23088,
+      "val_accuracy": 0.9135,
+      "lr": 0.001,
+      "seconds": 47.5
+    },
+    {
+      "epoch": 11,
+      "train_loss": 0.27743,
+      "val_loss": 0.22584,
+      "val_accuracy": 0.91433,
+      "lr": 0.0005,
+      "seconds": 45.2
+    },
+    {
+      "epoch": 12,
+      "train_loss": 0.25822,
+      "val_loss": 0.20482,
+      "val_accuracy": 0.92067,
+      "lr": 0.0005,
+      "seconds": 46.7
+    },
+    {
+      "epoch": 13,
+      "train_loss": 0.2517,
+      "val_loss": 0.2068,
+      "val_accuracy": 0.92067,
+      "lr": 0.0005,
+      "seconds": 44.7
+    },
+    {
+      "epoch": 14,
+      "train_loss": 0.24687,
+      "val_loss": 0.20083,
+      "val_accuracy": 0.9245,
+      "lr": 0.0005,
+      "seconds": 43.9
+    },
+    {
+      "epoch": 15,
+      "train_loss": 0.24599,
+      "val_loss": 0.20777,
+      "val_accuracy": 0.91817,
+      "lr": 0.0005,
+      "seconds": 44.7
+    },
+    {
+      "epoch": 16,
+      "train_loss": 0.24048,
+      "val_loss": 0.20175,
+      "val_accuracy": 0.92183,
+      "lr": 0.00025,
+      "seconds": 45.9
+    },
+    {
+      "epoch": 17,
+      "train_loss": 0.23205,
+      "val_loss": 0.19322,
+      "val_accuracy": 0.92683,
+      "lr": 0.00025,
+      "seconds": 46.9
+    },
+    {
+      "epoch": 18,
+      "train_loss": 0.22919,
+      "val_loss": 0.19129,
+      "val_accuracy": 0.9245,
+      "lr": 0.00025,
+      "seconds": 45.7
+    },
+    {
+      "epoch": 19,
+      "train_loss": 0.22717,
+      "val_loss": 0.19484,
+      "val_accuracy": 0.92483,
+      "lr": 0.000125,
+      "seconds": 45.6
+    },
+    {
+      "epoch": 20,
+      "train_loss": 0.22074,
+      "val_loss": 0.18728,
+      "val_accuracy": 0.92767,
+      "lr": 0.000125,
+      "seconds": 48.5
+    }
+  ],
+  "selected_epoch": 20,
+  "validation_accuracy": 0.92767,
+  "test": {
+    "accuracy": 0.9246,
+    "macro_f1": 0.92449,
+    "per_class": {
+      "Camiseta/top": {
+        "precision": 0.8834,
+        "recall": 0.864,
+        "f1": 0.8736,
+        "support": 1000
+      },
+      "Pantalón": {
+        "precision": 0.996,
+        "recall": 0.991,
+        "f1": 0.9935,
+        "support": 1000
+      },
+      "Jersey": {
+        "precision": 0.8907,
+        "recall": 0.88,
+        "f1": 0.8853,
+        "support": 1000
+      },
+      "Vestido": {
+        "precision": 0.9273,
+        "recall": 0.931,
+        "f1": 0.9291,
+        "support": 1000
+      },
+      "Abrigo": {
+        "precision": 0.8576,
+        "recall": 0.897,
+        "f1": 0.8768,
+        "support": 1000
+      },
+      "Sandalia": {
+        "precision": 0.9879,
+        "recall": 0.983,
+        "f1": 0.9855,
+        "support": 1000
+      },
+      "Camisa": {
+        "precision": 0.7808,
+        "recall": 0.766,
+        "f1": 0.7733,
+        "support": 1000
+      },
+      "Zapatilla": {
+        "precision": 0.9525,
+        "recall": 0.982,
+        "f1": 0.967,
+        "support": 1000
+      },
+      "Bolso": {
+        "precision": 0.9861,
+        "recall": 0.991,
+        "f1": 0.9885,
+        "support": 1000
+      },
+      "Botín": {
+        "precision": 0.9836,
+        "recall": 0.961,
+        "f1": 0.9722,
+        "support": 1000
+      }
+    },
+    "confusion_matrix": {
+      "labels": [
+        "Camiseta/top",
+        "Pantalón",
+        "Jersey",
+        "Vestido",
+        "Abrigo",
+        "Sandalia",
+        "Camisa",
+        "Zapatilla",
+        "Bolso",
+        "Botín"
+      ],
+      "rows_true_cols_pred": [
+        [
+          864,
+          0,
+          13,
+          9,
+          4,
+          2,
+          100,
+          0,
+          8,
+          0
+        ],
+        [
+          0,
+          991,
+          0,
+          6,
+          2,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          15,
+          0,
+          880,
+          10,
+          49,
+          0,
+          46,
+          0,
+          0,
+          0
+        ],
+        [
+          8,
+          2,
+          7,
+          931,
+          22,
+          0,
+          28,
+          0,
+          2,
+          0
+        ],
+        [
+          2,
+          0,
+          35,
+          26,
+          897,
+          0,
+          40,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          983,
+          0,
+          14,
+          0,
+          3
+        ],
+        [
+          87,
+          1,
+          53,
+          18,
+          72,
+          0,
+          766,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          5,
+          0,
+          982,
+          0,
+          13
+        ],
+        [
+          1,
+          1,
+          0,
+          4,
+          0,
+          1,
+          1,
+          1,
+          991,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0,
+          4,
+          0,
+          34,
+          0,
+          961
+        ]
+      ]
+    }
+  },
+  "acceptance": {
+    "target_test_accuracy": 0.91,
+    "passed": true
+  },
+  "artifact": {
+    "path": "backend/app/models/product_cnn.pt",
+    "format": "TorchScript",
+    "sha256": "44aca28867b50caa2637b19a87aa0b92476f0e9ef1cea619b459026961e52129"
+  }
+}
