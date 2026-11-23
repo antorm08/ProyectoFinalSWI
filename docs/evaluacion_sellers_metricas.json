@@ -1,0 +1,141 @@
+{
+  "audit": {
+    "source_orders": 99441,
+    "delivered_status": 96478,
+    "missing_target_dates": 8,
+    "eligible_orders": 96470,
+    "late_calendar_day": 6534,
+    "source_item_rows": 112650,
+    "eligible_item_rows": 110189,
+    "seller_order_rows": 97811,
+    "rows_after_reviews_join": 97811,
+    "seller_orders_without_review": 660,
+    "sellers_with_eligible_orders": 2970,
+    "sellers_below_minimum": 1204,
+    "sellers_missing_metrics_after_minimum": 0,
+    "eligible_sellers": 1766
+  },
+  "min_pedidos": 5,
+  "features": [
+    "n_pedidos",
+    "facturacion",
+    "nota_media",
+    "tasa_retraso",
+    "dias_entrega_medio"
+  ],
+  "k_seleccionado": 4,
+  "estabilidad_ari_medio": 0.9491,
+  "barrido_k": [
+    {
+      "k": 2,
+      "inertia": 6416.34,
+      "silhouette": 0.2664,
+      "calinski_harabasz": 663.57,
+      "davies_bouldin": 1.4355
+    },
+    {
+      "k": 3,
+      "inertia": 4689.26,
+      "silhouette": 0.3053,
+      "calinski_harabasz": 778.39,
+      "davies_bouldin": 1.1225
+    },
+    {
+      "k": 4,
+      "inertia": 4095.72,
+      "silhouette": 0.2515,
+      "calinski_harabasz": 678.91,
+      "davies_bouldin": 1.3713
+    },
+    {
+      "k": 5,
+      "inertia": 3674.99,
+      "silhouette": 0.221,
+      "calinski_harabasz": 617.55,
+      "davies_bouldin": 1.3341
+    },
+    {
+      "k": 6,
+      "inertia": 3327.44,
+      "silhouette": 0.2268,
+      "calinski_harabasz": 582.1,
+      "davies_bouldin": 1.3012
+    },
+    {
+      "k": 7,
+      "inertia": 3102.41,
+      "silhouette": 0.2218,
+      "calinski_harabasz": 541.24,
+      "davies_bouldin": 1.3037
+    },
+    {
+      "k": 8,
+      "inertia": 2900.55,
+      "silhouette": 0.2179,
+      "calinski_harabasz": 513.4,
+      "davies_bouldin": 1.3041
+    }
+  ],
+  "comparacion_algoritmos": [
+    {
+      "algoritmo": "K-Means (seleccionado)",
+      "silhouette": 0.2515,
+      "calinski_harabasz": 678.91,
+      "davies_bouldin": 1.3713
+    },
+    {
+      "algoritmo": "Agglomerative (Ward)",
+      "silhouette": 0.1672,
+      "calinski_harabasz": 545.82,
+      "davies_bouldin": 1.298
+    },
+    {
+      "algoritmo": "Gaussian Mixture (GMM)",
+      "silhouette": 0.2001,
+      "calinski_harabasz": 485.17,
+      "davies_bouldin": 1.6352
+    }
+  ],
+  "perfiles_clusters": [
+    {
+      "cluster": 0,
+      "etiqueta": "Vendedores estrella (alto volumen)",
+      "n_pedidos": 151.32,
+      "facturacion": 19574.51,
+      "nota_media": 4.19,
+      "tasa_retraso": 0.06,
+      "dias_entrega_medio": 12.15,
+      "n_vendedores": 504
+    },
+    {
+      "cluster": 1,
+      "etiqueta": "Vendedores estables",
+      "n_pedidos": 12.46,
+      "facturacion": 1426.55,
+      "nota_media": 4.52,
+      "tasa_retraso": 0.01,
+      "dias_entrega_medio": 9.01,
+      "n_vendedores": 584
+    },
+    {
+      "cluster": 2,
+      "etiqueta": "Logística problemática",
+      "n_pedidos": 17.7,
+      "facturacion": 3620.59,
+      "nota_media": 3.5,
+      "tasa_retraso": 0.24,
+      "dias_entrega_medio": 20.11,
+      "n_vendedores": 151
+    },
+    {
+      "cluster": 3,
+      "etiqueta": "Baja satisfacción",
+      "n_pedidos": 17.47,
+      "facturacion": 2749.47,
+      "nota_media": 4.0,
+      "tasa_retraso": 0.08,
+      "dias_entrega_medio": 12.98,
+      "n_vendedores": 527
+    }
+  ]
+}
