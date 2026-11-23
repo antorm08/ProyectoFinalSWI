@@ -66,6 +66,10 @@ def metricas_publicables(informe: dict, ganador: str | None) -> dict | None:
     muestra y su relMAE oscila entre 0,6 y 1,2 para el mismo modelo (ver la
     dispersión por origen en el informe); publicar esa cifra como "el error del
     modelo" sería quedarse con un sorteo en vez de con ocho ventanas.
+
+    Lo mismo vale para la cobertura de la banda: se publica la de los ocho
+    orígenes, no la de la ventana reservada. El criterio de aceptación sí mira
+    el holdout; son dos preguntas distintas.
     """
     desarrollo = (informe.get("development") or {}).get(ganador or "")
     if not desarrollo:
@@ -78,7 +82,8 @@ def metricas_publicables(informe: dict, ganador: str | None) -> dict | None:
         "mae": desarrollo["mae"],
         "mase": desarrollo["mase"],
         "rel_mae": desarrollo["rel_mae"],
-        "cobertura_80": (informe.get("final_holdout") or {}).get("cobertura_80"),
+        "cobertura_80": ((informe.get("development_calibrated_coverage") or {}).get("media")
+                         or (informe.get("final_holdout") or {}).get("cobertura_80")),
         "baseline_mae": (informe.get("development") or {}).get("naive_estacional", {}).get("mae"),
         "periodo": periodo,
     }

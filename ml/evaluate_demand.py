@@ -51,7 +51,7 @@ else:
     )
 
 from app.services.demand_model import (
-    BLOQUE_DIAS, Especificacion, ajustar, convergio, pronosticar,
+    BLOQUE_DIAS, Especificacion, ajustar, convergio, pronostico_puntual, pronosticar,
 )
 
 DEFAULT_OUTPUT = ROOT / "docs" / "resultados_demanda"
@@ -63,7 +63,13 @@ BASELINE = "naive_estacional"
 
 #: Candidatos que el backend sabe reconstruir y servir con banda. El artefacto
 #: sale de aquí: un modelo sin intervalos no puede cumplir el contrato de la API.
-SERVIBLES = ("sarima_heredado", "sarimax_elegido")
+SERVIBLES = ("sarima_heredado", "sarimax_elegido", "perfil_por_nivel")
+
+#: Especificación de la familia `perfil`. Sus dos parámetros se fijaron antes de
+#: medir, a partir del barrido de sensibilidad de docs/algoritmos_demanda.md,
+#: que mostró una región buena ancha (19 de 25 combinaciones por debajo de 0,90)
+#: en vez de un óptimo puntual.
+SPEC_PERFIL = Especificacion(familia="perfil", semanas_forma=12, dias_nivel=28)
 
 #: Protocolo de calibración de la banda: horizonte completo de la API.
 CALIBRACION = {"horizonte": 90, "n_origenes": 6, "paso": 28}
@@ -129,6 +135,27 @@ def candidato_sarimax(spec: Especificacion):
         return marco, {"aic": float(resultados.aic), "convergio": convergio(resultados)}
 
     return ejecutar
+
+
+def candidato_perfil(train, steps, nivel):
+    """Forma de la semana x nivel reciente. Sin banda: no tiene intervalo teórico."""
+    estado = ajustar(train, SPEC_PERFIL)
+    futuro = pd.date_range(train.index[-1] + pd.Timedelta(days=1), periods=steps, freq="D")
+    valores = estado.nivel * estado.forma[futuro.day_of_week.to_numpy()]
+    return pd.DataFrame({"valor": valores}, index=futuro), {}
+
+
+def residuos_perfil(serie: pd.Series, spec: Especificacion) -> pd.Series:
+    """Residuos de reconstrucción del perfil, para el diagnóstico de la ACF.
+
+    Cada día se reconstruye con el nivel de los `dias_nivel` anteriores por la
+    forma de su día de la semana; nunca con información del propio día.
+    """
+    estado = ajustar(serie, spec)
+    nivel = serie.rolling(spec.dias_nivel).mean().shift(1)
+    previsto = nivel * pd.Series(estado.forma[serie.index.day_of_week.to_numpy()],
+                                 index=serie.index)
+    return (serie - previsto).dropna()
 
 
 SPEC_HEREDADA = Especificacion(
@@ -360,9 +387,7 @@ def calibrar(spec: Especificacion, serie: pd.Series, *, horizonte: int, n_origen
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             resultados = ajustar(train, spec)
-        marco = pronosticar(resultados, train, spec, len(test), 0.8)
-        marco.index = test.index
-        previsto = marco["valor"].to_numpy(dtype=float)
+        previsto = pronostico_puntual(resultados, train, spec, len(test)).to_numpy(dtype=float)
         suelo += int((previsto < 1).sum())
         relativo = (test.to_numpy(dtype=float) - previsto) / np.maximum(previsto, 1.0)
         for paso_h, error in enumerate(relativo):
@@ -499,6 +524,7 @@ def run(output: Path, *, rapido: bool = False) -> dict:
         "ets_semanal": candidato_ets,
         "sarima_heredado": candidato_sarimax(SPEC_HEREDADA),
         "sarimax_elegido": candidato_sarimax(spec),
+        "perfil_por_nivel": candidato_perfil,
     }
 
     resumen = {}
@@ -522,7 +548,9 @@ def run(output: Path, *, rapido: bool = False) -> dict:
     ejecutar_ganador = candidatos[ganador]
     cobertura = coberturas_por_nivel(ejecutar_ganador, particiones)
 
-    spec_ganadora = spec if ganador == "sarimax_elegido" else SPEC_HEREDADA
+    specs = {"sarimax_elegido": spec, "sarima_heredado": SPEC_HEREDADA,
+             "perfil_por_nivel": SPEC_PERFIL}
+    spec_ganadora = specs[ganador]
     print(f"Calibrando la banda del ganador sobre {CALIBRACION['horizonte']} días…")
     calibracion = calibrar(spec_ganadora, datos, holdout=horizonte, **CALIBRACION)
     print(f"  {calibracion['origenes']} orígenes, "
@@ -533,6 +561,24 @@ def run(output: Path, *, rapido: bool = False) -> dict:
           f"[{calibracion['resumen_por_bloque'][-1]['q10']:+.3f}, "
           f"{calibracion['resumen_por_bloque'][-1]['q90']:+.3f}]")
 
+    # Cobertura de la banda calibrada en los ocho orígenes, sobre 224 días. Es
+    # la cifra que publica la aplicación, por coherencia con el MAE: lo que se
+    # enseña sale del backtesting. El criterio de aceptación sigue mirando el
+    # holdout, que no se ha tocado.
+    coberturas_desarrollo = []
+    for train_o, test_o in particiones:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ajuste_o = ajustar(train_o, spec_ganadora)
+        marco_o = pronosticar(ajuste_o, train_o, spec_ganadora, len(test_o), 0.8,
+                              calibracion=calibracion)
+        marco_o.index = test_o.index
+        coberturas_desarrollo.append(coverage(test_o, marco_o["inferior"], marco_o["superior"]))
+    cobertura_desarrollo = float(np.mean(coberturas_desarrollo))
+    resumen[ganador]["cobertura_calibrada"] = cobertura_desarrollo
+    print(f"  cobertura calibrada en los {len(particiones)} orígenes de desarrollo: "
+          f"{cobertura_desarrollo:.3f}")
+
     # Holdout final: una sola vez, con el modelo congelado y la banda calibrada
     # con datos que este tramo no vio.
     train_final, test_final = final_holdout(datos, holdout=horizonte)
@@ -542,8 +588,11 @@ def run(output: Path, *, rapido: bool = False) -> dict:
     marco_final = pronosticar(ajuste_final, train_final, spec_ganadora, len(test_final), 0.8,
                               calibracion=calibracion)
     marco_final.index = test_final.index
-    teorico = pronosticar(ajuste_final, train_final, spec_ganadora, len(test_final), 0.8)
-    teorico.index = test_final.index
+    try:
+        teorico = pronosticar(ajuste_final, train_final, spec_ganadora, len(test_final), 0.8)
+        teorico.index = test_final.index
+    except Exception:
+        teorico = None   # la familia `perfil` no tiene intervalo teórico
     base_final = seasonal_naive(train_final, len(test_final))
     base_final.index = test_final.index
     final = {
@@ -552,39 +601,42 @@ def run(output: Path, *, rapido: bool = False) -> dict:
         "rel_mae": rel_mae(test_final, marco_final["valor"], train_final),
         "periodo": f"{test_final.index[0].date()} a {test_final.index[-1].date()}",
         "baseline_mae": metrics(test_final, base_final)["mae"],
-        "aic": float(ajuste_final.aic),
+        "aic": (float(ajuste_final.aic) if spec_ganadora.familia == "sarimax" else None),
         "convergio": convergio(ajuste_final),
         "cobertura_80": coverage(test_final, marco_final["inferior"], marco_final["superior"]),
-        "cobertura_80_teorica": coverage(test_final, teorico["inferior"], teorico["superior"]),
+        "cobertura_80_teorica": (coverage(test_final, teorico["inferior"], teorico["superior"])
+                                 if teorico is not None else None),
         "banda_media": float((marco_final["superior"] - marco_final["inferior"]).mean()),
-        "banda_media_teorica": float((teorico["superior"] - teorico["inferior"]).mean()),
+        "banda_media_teorica": (float((teorico["superior"] - teorico["inferior"]).mean())
+                                if teorico is not None else None),
     }
-    print(f"  cobertura del 80 %: calibrada {final['cobertura_80']:.3f} "
-          f"frente a teórica {final['cobertura_80_teorica']:.3f}")
+    teorica = final["cobertura_80_teorica"]
+    print(f"  cobertura del 80 %: calibrada {final['cobertura_80']:.3f}" +
+          (f" frente a teórica {teorica:.3f}" if teorica is not None
+           else " (esta familia no tiene intervalo teórico)"))
     print(f"Holdout final ({final['periodo']}): MAE {final['mae']:.2f} "
           f"relMAE {final['rel_mae']:.3f}")
 
     residuos = {"cobertura": cobertura}
-    if spec_ganadora is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            ajuste = ajustar(train_final, spec_ganadora)
-        serie_residuos = pd.Series(np.asarray(ajuste.resid, dtype=float), index=train_final.index)
-        from statsmodels.stats.diagnostic import acorr_ljungbox
-        from statsmodels.tsa.stattools import acf
-        prueba = acorr_ljungbox(serie_residuos, lags=[PERIODO, 14, 28], return_df=True)
-        residuos |= {
-            "serie": serie_residuos,
-            "acf": acf(serie_residuos, nlags=28, fft=True),
-            "banda": float(1.96 / np.sqrt(len(serie_residuos))),
-            "ljung_box": {
-                str(int(lag)): {"estadistico": float(fila["lb_stat"]), "pvalue": float(fila["lb_pvalue"])}
-                for lag, fila in prueba.iterrows()
-            },
-        }
-    else:
-        residuos |= {"serie": pd.Series(dtype=float, index=pd.DatetimeIndex([])),
-                     "acf": np.zeros(29), "banda": 0.0, "ljung_box": {}}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        if spec_ganadora.familia == "perfil":
+            serie_residuos = residuos_perfil(train_final, spec_ganadora)
+        else:
+            serie_residuos = pd.Series(np.asarray(ajustar(train_final, spec_ganadora).resid,
+                                                  dtype=float), index=train_final.index)
+    from statsmodels.stats.diagnostic import acorr_ljungbox
+    from statsmodels.tsa.stattools import acf
+    prueba = acorr_ljungbox(serie_residuos, lags=[PERIODO, 14, 28], return_df=True)
+    residuos |= {
+        "serie": serie_residuos,
+        "acf": acf(serie_residuos, nlags=28, fft=True),
+        "banda": float(1.96 / np.sqrt(len(serie_residuos))),
+        "ljung_box": {
+            str(int(lag)): {"estadistico": float(fila["lb_stat"]), "pvalue": float(fila["lb_pvalue"])}
+            for lag, fila in prueba.iterrows()
+        },
+    }
 
     cobertura_80 = final.get("cobertura_80")
     desarrollo_ganador = resumen[ganador]
@@ -666,6 +718,14 @@ def run(output: Path, *, rapido: bool = False) -> dict:
             ),
         },
         "interval_coverage": cobertura,
+        "development_calibrated_coverage": {
+            "media": cobertura_desarrollo,
+            "por_origen": [round(c, 4) for c in coberturas_desarrollo],
+            "origenes": len(particiones),
+            "dias": len(particiones) * horizonte,
+            "nota": ("cobertura de la banda calibrada en los orígenes de desarrollo; "
+                     "es la cifra que publica la aplicación"),
+        },
         "calibration": calibracion,
         "residual_diagnostics": residuos["ljung_box"],
         "final_holdout": final,

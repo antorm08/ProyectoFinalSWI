@@ -21,7 +21,9 @@ from app.core.config import DEMAND_MODEL
 from app.db import olist
 from app.schemas import DemandMetrics, DemandOutput, ForecastPoint
 from app.services.demand_calendar import calendar_exog
-from app.services.demand_model import BundleIncompatible, desempaquetar, pronosticar
+from app.services.demand_model import (
+    BundleIncompatible, ajustar, desempaquetar, pronosticar,
+)
 
 log = logging.getLogger(__name__)
 
@@ -92,11 +94,15 @@ def _sintetico() -> pd.Series:
 
 
 def _al_dia(serie: pd.Series, resultados, spec, bundle_fin: pd.Timestamp):
-    """Extiende el modelo con los días reales posteriores al artefacto, sin reajustar.
+    """Extiende el modelo con los días reales posteriores al artefacto.
 
-    `append` vuelve a filtrar con los mismos parámetros, así que incorpora datos
-    nuevos sin reoptimizar. Solo se aplica si la continuación es limpia; ante
-    cualquier duda se sigue con el histórico del artefacto.
+    En `sarimax`, `append` vuelve a filtrar con los mismos parámetros, así que
+    incorpora datos nuevos sin reoptimizar. En `perfil` basta con recalcular la
+    forma y el nivel sobre la serie ampliada, que cuesta menos de un milisegundo
+    y no tiene optimizador que pueda desviarse.
+
+    Solo se aplica si la continuación es limpia; ante cualquier duda se sigue
+    con el histórico del artefacto.
     """
     vivo = _historico_vivo()
     if vivo is None:
@@ -108,12 +114,16 @@ def _al_dia(serie: pd.Series, resultados, spec, bundle_fin: pd.Timestamp):
     if not nuevos.index.equals(esperado) or (nuevos == 0).any():
         return serie, resultados
     try:
+        completa = pd.concat([serie, nuevos])
+        if spec.familia == "perfil":
+            return completa, ajustar(completa, spec)
+
         from app.services.demand_model import transformar
 
         endog = pd.Series(transformar(nuevos.to_numpy(dtype=float), spec.transform),
                           index=nuevos.index)
         exog = calendar_exog(nuevos.index) if spec.exog else None
-        return pd.concat([serie, nuevos]), resultados.append(endog, exog=exog)
+        return completa, resultados.append(endog, exog=exog)
     except Exception as error:
         log.warning("No se pudieron anexar %d días nuevos (%s)", len(nuevos), error)
         return serie, resultados
