@@ -13,7 +13,7 @@ Ver `data/README.md`.
 ## 3. Instalación del backend
 ## 4. Entrenamiento de los modelos
 
-### Pronóstico de demanda (SARIMAX · Olist)
+### Pronóstico de demanda (perfil semanal · Olist)
 
 Necesita los CSV de Olist en `data/olist/` (§2). No hace falta PyTorch. Desde la raíz del proyecto:
 
@@ -21,11 +21,14 @@ Necesita los CSV de Olist en `data/olist/` (§2). No hace falta PyTorch. Desde l
 # 1) Auditar la serie sin entrenar: ventana, huecos de cobertura y cola truncada
 backend\.venv\Scripts\python.exe -m ml.train_demand --check-data
 
-# 2) Comparar candidatos y congelar la especificación (~10-20 min; escribe gráficas y métricas)
+# 2) Comparar candidatos y congelar el modelo (~15 min; escribe gráficas y métricas)
 backend\.venv\Scripts\python.exe -m ml.evaluate_demand
 
 # 3) Entrenar el artefacto que sirve la API (~1 min)
 backend\.venv\Scripts\python.exe -m ml.train_demand
+
+# 4) Opcional: banco de 18 algoritmos (~90 s), el que motivó el modelo actual
+backend\.venv\Scripts\python.exe -m ml.benchmark_demand
 ```
 
 - `evaluate_demand.py` escribe `docs/resultados_demanda/metricas.json` y cinco gráficas. **No sobrescribe**: si el
@@ -43,6 +46,7 @@ Pruebas del componente (desde la raíz):
 ```powershell
 backend\.venv\Scripts\python.exe -m unittest ml.tests.test_demand -v
 backend\.venv\Scripts\python.exe -m unittest ml.tests.test_demand_api -v
+backend\.venv\Scripts\python.exe -m unittest ml.tests.test_demand_benchmark -v
 ```
 
 ### Clasificación de productos (CNN · Fashion-MNIST)

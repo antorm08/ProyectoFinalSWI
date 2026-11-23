@@ -16,7 +16,7 @@
 ### 2.3 Backend / API (FastAPI)
 ### 2.4 Componentes de IA
 #### 2.4.1 Predicción de retraso – datos, variables, modelo, métricas (ROC-AUC, F1)
-#### 2.4.2 Series temporales – serie diaria, SARIMAX, validación (MAE, MASE, cobertura)
+#### 2.4.2 Series temporales – serie diaria, perfil semanal calibrado, validación (MAE, MASE, cobertura)
 
 **Problema.** Un operador logístico necesita saber cuántos pedidos entrarán cada día de las próximas semanas para
 dimensionar almacén, personal de preparación y contratación de transporte. Un número suelto no sirve para eso: hace
@@ -33,73 +33,75 @@ retrocediendo después hasta el comienzo del descenso. Resultado: **2017-01-05 a
 ningún cero**. El recorte importa: con la cola dentro, el error del tramo de prueba subía de 41 a 78 pedidos/día
 porque el modelo "predecía" una caída que era de recolección y no de demanda.
 
-**Modelo.** SARIMAX en escala bruta con estacionalidad semanal y exógenas de calendario:
+**Modelo: perfil semanal × nivel reciente.** La demanda prevista para un día es
 
-| Elemento | Valor | Función |
-|---|---|---|
-| Orden no estacional | (2, 1, 2) | Tendencia y memoria corta; `d = 1` por contraste ADF y KPSS |
-| Orden estacional | (1, 1, 1)[7] | Ciclo semanal: el lunes se parece al lunes anterior |
-| Exógenas | `festivo`, `black_friday`, `black_friday_cola` | Fechas conocidas de antemano, declaradas como tabla |
-| Transformación | ninguna | `log1p` se probó y empeoró en las dos familias |
+> *forma del día de la semana* × *nivel reciente*
 
-La especificación salió de recorrer **288 combinaciones** sin ningún fallo de ajuste, organizadas en cuatro familias
-según escala y uso de exógenas. El AIC filtra dentro de cada familia, que es donde es comparable, y el backtesting
-decide entre ellas. **El AIC elige mal**: su ganador pronostica peor que el baseline (relMAE 1,013), porque mide
-ajuste dentro de la muestra y no capacidad de pronóstico.
+donde la **forma** es la media de ese día de la semana en las últimas 12 semanas, normalizada por la media del
+período, y el **nivel** es la media de los últimos 28 días. Son ocho números —siete factores y un nivel— y no hay
+optimizador.
+
+| Día | Lun | Mar | Mié | Jue | Vie | Sáb | Dom |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Factor de forma | 1,150 | 1,121 | 1,125 | 1,066 | 0,951 | 0,763 | 0,824 |
+
+**Cómo se llegó a ese modelo, y por qué no es un SARIMA.** El componente nació con un SARIMAX, y su especificación se
+eligió recorriendo 288 combinaciones (órdenes hasta 2, estacionalidad semanal, escala bruta o logarítmica, con y sin
+exógenas de calendario), con el AIC filtrando dentro de cada familia y el backtesting decidiendo entre ellas. El mejor
+SARIMAX obtuvo un MAE relativo de 0,866. Un banco posterior de **dieciocho algoritmos** —Theta, Holt-Winters
+amortiguado, STL + ARIMA, regresión armónica, Ridge y gradient boosting sobre calendario, y seis variantes de perfil
+semanal— midió que toda la familia del perfil pronostica mejor, y el protocolo de selección, al incorporarla como
+candidata, la elige. El diagnóstico que lo explica: el error del SARIMAX era en una quinta parte error de **nivel**, y
+su sesgo crecía de +1,5 pedidos/día en la primera semana del horizonte a +35,6 en la cuarta, porque extrapolaba una
+tendencia que no se sostiene.
 
 **Validación** (`ml/evaluate_demand.py`): ocho orígenes móviles con ventana expansiva, horizonte de 28 días y paso de
-14 (224 días evaluados), más un tramo reservado de 28 días que se mira una sola vez. El baseline obligatorio es
-**repetir la última semana**, que es exactamente lo que hace la aplicación sin modelo entrenado. La métrica principal
-es el **MAE relativo** a ese baseline: vale 1 para él, y por debajo de 1 el modelo aporta.
-
-**Resultados en desarrollo** (8 ventanas de 28 días):
+14 (224 días evaluados), más un tramo reservado de 28 días. El baseline obligatorio es **repetir la última semana**,
+que es exactamente lo que hace la aplicación sin modelo entrenado.
 
 | Modelo | MAE | MASE | relMAE | Gana a / 8 |
 |---|---:|---:|---:|---:|
-| *Repetir la última semana (baseline)* | 48,67 | 1,476 | 1,000 | 0 |
-| **Media por día de la semana** | **40,98** | **1,243** | **0,842** | **6** |
-| **SARIMA(2,1,2)(1,1,1)[7] + calendario** (activo) | 42,68 | 1,294 | 0,866 | 5 |
+| **Perfil semanal × nivel** (activo) | **40,33** | **1,224** | **0,822** | **7** |
+| Media por día de la semana, 4 semanas | 40,98 | 1,243 | 0,842 | 6 |
+| SARIMA(2,1,2)(1,1,1)[7] + calendario | 42,68 | 1,294 | 0,866 | 5 |
 | SARIMA(1,1,1)(1,0,1)[7] | 46,75 | 1,420 | 0,954 | 4 |
+| *Repetir la última semana (baseline)* | 48,67 | 1,476 | 1,000 | 0 |
 | Holt-Winters aditivo | 50,31 | 1,526 | 1,039 | 2 |
 
 ![MAE por origen](resultados_demanda/backtest_por_origen.png)
 
-**La banda no sale del modelo, sale de los errores medidos.** El intervalo teórico de statsmodels prometía un 80 % y
-cubría el **62 %**; otras especificaciones tenían el defecto contrario, bandas tan anchas que cubrían el 92 % y no
-informaban de nada. La banda activa se construye con los cuantiles empíricos del error relativo observado en el
-backtesting, por bloques semanales del horizonte. En el tramo reservado la cobertura sube de **46 % a 75 %** frente al
-80 % nominal. La mediana del error pasa de +5 % a los pocos días a −23 % a los tres meses, y la banda recoge esa
-asimetría; la teórica, simétrica por construcción, no podía.
+**La banda no sale del modelo, sale de los errores medidos.** Una media agrupada no es un modelo probabilístico y no
+tiene intervalo teórico; tampoco servía el del SARIMAX, que prometía un 80 % y cubría un 62 %. El intervalo se
+construye con los cuantiles empíricos del error relativo observado en el backtesting, por bloques semanales del
+horizonte (6 orígenes, 90 días, 13 bloques). Se ensancha con el horizonte porque los errores se ensanchan y es
+asimétrico porque los errores lo son. **Cobertura medida en los ocho orígenes: 86,2 %** frente al 80 % nominal.
 
-**Resultados en el tramo reservado** (2018-07-22 a 2018-08-18): MAE 60,99, MASE 1,740, relMAE **1,229**, cobertura del
-80 % → **75,0 %**. En esa ventana el modelo pierde contra el baseline por un cambio de nivel real: julio promedia 203
-pedidos/día y los dieciocho primeros días de agosto promedian 284, con picos de 370. Una ventana de 28 días no arbitra
-entre modelos: en los ocho orígenes de desarrollo el relMAE del mismo modelo va de 0,60 a 1,14. Por eso el criterio de
-aceptación juzga la precisión sobre el promedio de las ocho ventanas (0,866 < 1 ✅) y reserva el tramo final para lo
-que sí comprueba limpiamente, que la calibración funciona en días que no la produjeron (75 % ✅).
+**Resultados en el tramo reservado** (2018-07-22 a 2018-08-18): MAE 82,79, relMAE 1,668, cobertura 32,1 %. **El
+componente no pasa su criterio de aceptación completo**, y la razón está medida: esa ventana contiene un salto de
+nivel del **+44 %** —julio promedia 203 pedidos/día y los dieciocho primeros días de agosto, 284— mientras que el
+mayor salto en los datos de calibración fue del +12,6 %. Ninguna banda construida con el pasado podía cubrirlo. El
+SARIMAX lo hizo mejor en esa ventana concreta porque su sesgo sistemático al alza apuntaba por casualidad en la
+dirección correcta.
 
 **Integración en la aplicación.** `GET /api/demand/forecast?horizonte=&historico=&nivel=` devuelve el histórico
 reciente y el pronóstico; cada punto futuro lleva `inferior` y `superior`, y la respuesta incluye el modelo, el ancla
 temporal, la ventana de entrenamiento y las métricas medidas. El horizonte está acotado a **90 días** porque la
-ventana cubre 84 semanas y ningún ciclo anual completo. El artefacto no serializa el objeto de statsmodels: guarda los
-parámetros y la especificación, y el servicio reconstruye el modelo con `SARIMAX(...).smooth(params)`, 28,6 KB que
-sobreviven a una actualización de la librería. El entrenamiento comprueba que el artefacto recargado reproduce su
-propio pronóstico antes de activarlo (desvío 0,00e+00). Si el artefacto falta o es incompatible, la API **no devuelve
-un 500**: cae a repetir la última semana y lo declara en pantalla.
+ventana cubre 84 semanas y ningún ciclo anual completo. El artefacto son 28,6 KB; el ajuste tarda **0,65 ms** frente a
+los 1,8 s del SARIMAX, y una petición de 90 días se resuelve en **21 ms**. El entrenamiento comprueba que el artefacto
+recargado reproduce su propio pronóstico antes de activarlo (desvío 0,00e+00). Si el artefacto falta o es
+incompatible, la API **no devuelve un 500**: cae a repetir la última semana y lo declara en pantalla.
 
-**Limitaciones.** Una regla trivial —la media por día de la semana— pronostica mejor que cualquier SARIMA probado
-(0,842 frente a 0,866). El banco de dieciocho algoritmos de `docs/algoritmos_demanda.md` confirma que no es casualidad:
-los seis estimadores de perfil semanal baten al modelo activo, con 3 a 4 pedidos/día menos de error y entre mil y mil
-ochocientas veces menos coste, aunque con ocho ventanas de prueba la ventaja no alcanza significación estadística. La
-recomendación es sustituir el pronosticador puntual y conservar la banda calibrada, que es independiente del modelo. Queda autocorrelación significativa en el retardo
-semanal (Ljung-Box p = 0,011), señal de que el término estacional no agota la estructura de la semana. El Black Friday
-de 2017 multiplicó por ocho un día normal y ocurre una sola vez en la serie: la exógena sabe qué día cae, no cuánto
-sube. Análisis completo: `docs/evaluacion_demanda.md`.
+**Limitaciones.** La banda describe la variación habitual, no un cambio de régimen: está calibrada con saltos de nivel
+de hasta ±25 %. El modelo no tiene dinámica y deja mucha autocorrelación sin explotar (Ljung-Box p < 0,001 en los
+retardos 7, 14 y 28), aunque los modelos que intentan capturarla pronostican peor a 28 días. No mira el calendario,
+así que no sabe nada de festivos ni del Black Friday, que además ocurre una sola vez en la serie. Análisis completo:
+`docs/evaluacion_demanda.md` y `docs/algoritmos_demanda.md`.
 
 **Pruebas.** `ml/tests/test_demand.py` (32 casos: construcción de la serie, reglas de ventana, baselines, ausencia de
-fuga entre orígenes, métricas y calendario) y `ml/tests/test_demand_api.py` (29 casos: artefacto, banda calibrada,
-contrato HTTP y degradación a modo provisional). Ninguna optimiza un SARIMAX. En el frontend, pruebas E2E de la
-pantalla en cuatro tamaños con auditoría de accesibilidad.
+fuga entre orígenes, métricas y calendario), `ml/tests/test_demand_api.py` (41 casos: las dos familias de modelo,
+artefacto, banda calibrada, contrato HTTP y degradación) y `ml/tests/test_demand_benchmark.py` (13 casos: contrato de
+los algoritmos y honestidad del banco). Ninguna optimiza un SARIMAX. En el frontend, pruebas E2E de la pantalla en
+cuatro tamaños con auditoría de accesibilidad.
 
 #### 2.4.3 Clasificación de imágenes – CNN, Fashion-MNIST, accuracy, matriz de confusión
 

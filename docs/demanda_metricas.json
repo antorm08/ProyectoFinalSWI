@@ -1,5 +1,5 @@
 {
-  "started_at_utc": "2026-11-23T19:53:40+00:00",
+  "started_at_utc": "2026-11-23T20:38:12+00:00",
   "protocol": {
     "target": "pedidos creados por día, cualquier estado",
     "ventana": "regla de cobertura, no literales de fecha",
@@ -20,9 +20,9 @@
     "olist_orders_dataset.csv": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf"
   },
   "code_sha256": {
-    "ml/train_demand.py": "0bcd553b15a1c51727ddb1f3b2614a4af5e5172987a8e711f5109044260f84ed",
+    "ml/train_demand.py": "b0092b819440f7ec10e152bf0084bbaa33d262b0194eec90657b2a0ae549c3ee",
     "ml/demand_series.py": "820ca2c16e6b3d5c2164ad439b832b616f26973d0079842c480e76a5f10cca7e",
-    "backend/app/services/demand_model.py": "dccb26b3667b0ccffbafe22865c6bb94dc9804e376e1a6c79d7cf3f92e6dfbe8",
+    "backend/app/services/demand_model.py": "d1cd862a2aedbeb6411fd513f1c9fdab5409a5d1dd1d160762d2ec4508f0c5e5",
     "backend/app/services/demand_calendar.py": "4d62e7ddae97a691ac9c8db916dcb175f88f021de29d089d269130eb85e26bb8"
   },
   "window": {
@@ -138,32 +138,22 @@
     }
   },
   "specification": {
-    "order": [
-      2,
-      1,
-      2
-    ],
-    "seasonal_order": [
-      1,
-      1,
-      1,
-      7
-    ],
-    "transform": "identidad",
-    "exog": true,
-    "nombre": "SARIMA(2,1,2)(1,1,1)[7] · calendario",
+    "familia": "perfil",
+    "semanas_forma": 12,
+    "dias_nivel": 28,
+    "nombre": "Perfil semanal (12 semanas) x nivel (28 días)",
     "procedencia": {
       "origen": "docs/resultados_demanda/metricas.json",
-      "ganador": "sarimax_elegido",
+      "ganador": "perfil_por_nivel",
       "criterio": "menor MAE relativo al naive estacional, promediado entre orígenes, entre los candidatos que el backend sabe reconstruir y servir con banda",
-      "nombre": "SARIMA(2,1,2)(1,1,1)[7] · calendario",
+      "nombre": "Perfil semanal (12 semanas) x nivel (28 días)",
       "banda": "calibrada con los errores del backtesting",
-      "evaluacion_completada": "2026-11-23T19:52:40+00:00",
+      "evaluacion_completada": "2026-11-23T20:37:52+00:00",
       "metricas_publicadas": {
-        "mae": 42.67701783021876,
-        "mase": 1.2939128018802792,
-        "rel_mae": 0.8660848145617381,
-        "cobertura_80": 0.75,
+        "mae": 40.3315654825886,
+        "mase": 1.223963497727715,
+        "rel_mae": 0.8220091130440108,
+        "cobertura_80": 0.8616071428571428,
         "baseline_mae": 48.66517857142857,
         "periodo": "8 ventanas de 28 días, 2018-03-18 a 2018-07-21"
       }
@@ -183,134 +173,134 @@
         "bloque": 1,
         "dias": "1-7",
         "n": 42,
-        "q10": -0.2011,
-        "q90": 0.4862,
-        "mediana": 0.0505
+        "q10": -0.2664,
+        "q90": 0.2531,
+        "mediana": 0.0443
       },
       {
         "bloque": 2,
         "dias": "8-14",
         "n": 42,
-        "q10": -0.2407,
-        "q90": 0.6336,
-        "mediana": -0.0233
+        "q10": -0.2236,
+        "q90": 0.4875,
+        "mediana": 0.0058
       },
       {
         "bloque": 3,
         "dias": "15-21",
         "n": 42,
-        "q10": -0.4255,
-        "q90": 0.4034,
-        "mediana": 0.0113
+        "q10": -0.3867,
+        "q90": 0.4274,
+        "mediana": 0.0457
       },
       {
         "bloque": 4,
         "dias": "22-28",
         "n": 42,
-        "q10": -0.5245,
-        "q90": 0.2789,
-        "mediana": 0.0026
+        "q10": -0.4338,
+        "q90": 0.4154,
+        "mediana": 0.0289
       },
       {
         "bloque": 5,
         "dias": "29-35",
         "n": 42,
-        "q10": -0.5377,
-        "q90": 0.2541,
-        "mediana": -0.106
+        "q10": -0.4695,
+        "q90": 0.342,
+        "mediana": -0.0484
       },
       {
         "bloque": 6,
         "dias": "36-42",
         "n": 42,
-        "q10": -0.325,
-        "q90": 0.1651,
-        "mediana": -0.0987
+        "q10": -0.3027,
+        "q90": 0.2389,
+        "mediana": -0.0054
       },
       {
         "bloque": 7,
         "dias": "43-49",
         "n": 42,
-        "q10": -0.3021,
-        "q90": 0.2409,
-        "mediana": -0.1108
+        "q10": -0.185,
+        "q90": 0.3758,
+        "mediana": -0.0087
       },
       {
         "bloque": 8,
         "dias": "50-56",
         "n": 42,
-        "q10": -0.3402,
-        "q90": 0.2311,
-        "mediana": -0.0954
+        "q10": -0.2373,
+        "q90": 0.3705,
+        "mediana": 0.0223
       },
       {
         "bloque": 9,
         "dias": "57-63",
         "n": 42,
-        "q10": -0.5376,
-        "q90": 0.366,
-        "mediana": -0.2111
+        "q10": -0.4904,
+        "q90": 0.5309,
+        "mediana": -0.0746
       },
       {
         "bloque": 10,
         "dias": "64-70",
         "n": 42,
-        "q10": -0.4945,
-        "q90": 0.1504,
-        "mediana": -0.2047
+        "q10": -0.3776,
+        "q90": 0.3545,
+        "mediana": -0.0486
       },
       {
         "bloque": 11,
         "dias": "71-77",
         "n": 42,
-        "q10": -0.4242,
-        "q90": 0.1474,
-        "mediana": -0.2265
+        "q10": -0.2964,
+        "q90": 0.2503,
+        "mediana": -0.0351
       },
       {
         "bloque": 12,
         "dias": "78-84",
         "n": 42,
-        "q10": -0.4624,
-        "q90": 0.1965,
-        "mediana": -0.218
+        "q10": -0.3258,
+        "q90": 0.379,
+        "mediana": -0.0309
       },
       {
         "bloque": 13,
         "dias": "85-90",
         "n": 36,
-        "q10": -0.4938,
-        "q90": 0.0052,
-        "mediana": -0.2254
+        "q10": -0.3639,
+        "q90": 0.2205,
+        "mediana": -0.0431
       }
     ]
   },
   "holdout": {
-    "mae": 60.989476836983854,
-    "rmse": 71.78914812565526,
-    "smape_pct": 24.468205088116672,
-    "bias": -59.84401946945062,
+    "mae": 82.7857142857143,
+    "rmse": 90.18737880267484,
+    "smape_pct": 35.263366771366094,
+    "bias": -82.7857142857143,
     "dias": 28,
-    "mase": 1.740052807951715,
-    "rel_mae": 1.2285650010327682,
-    "cobertura_80": 0.75,
+    "mase": 2.361907694112128,
+    "rel_mae": 1.667625899280576,
+    "cobertura_80": 0.32142857142857145,
     "baseline_mae": 49.642857142857146,
     "periodo": "2018-07-22 a 2018-08-18",
     "convergio": true
   },
   "published_metrics": {
-    "mae": 42.67701783021876,
-    "mase": 1.2939128018802792,
-    "rel_mae": 0.8660848145617381,
-    "cobertura_80": 0.75,
+    "mae": 40.3315654825886,
+    "mase": 1.223963497727715,
+    "rel_mae": 0.8220091130440108,
+    "cobertura_80": 0.8616071428571428,
     "baseline_mae": 48.66517857142857,
     "periodo": "8 ventanas de 28 días, 2018-03-18 a 2018-07-21"
   },
   "artifact": {
     "path": "backend/app/models/demand_model.joblib",
     "schema": 2,
-    "bytes": 28630,
-    "sha256": "433195681cfa1be618be7b036f183bb5313d5c87063ca18da3977215a7c8825f",
+    "bytes": 28561,
+    "sha256": "67e6c5f9b4b7708ebca6cb3662314914a4d77d741acf3ac04c5c675b39a4b687",
     "roundtrip": {
       "tolerancia": 1e-06,
       "desvio_maximo": {
@@ -324,10 +314,10 @@
   "acceptance": {
     "nota": "este script mide una sola ventana de 28 días, que no basta para juzgar la precisión: el veredicto vive en docs/resultados_demanda/metricas.json, que promedia varios orígenes. Aquí se publica para poder comparar",
     "objetivo_rel_mae": 1.0,
-    "rel_mae_holdout": 1.2285650010327682,
-    "cobertura_80_holdout": 0.75,
+    "rel_mae_holdout": 1.667625899280576,
+    "cobertura_80_holdout": 0.32142857142857145,
     "bate_al_baseline_en_esta_ventana": false
   },
-  "completed_at_utc": "2026-11-23T19:53:44+00:00",
-  "elapsed_seconds": 4.7
+  "completed_at_utc": "2026-11-23T20:38:12+00:00",
+  "elapsed_seconds": 0.2
 }

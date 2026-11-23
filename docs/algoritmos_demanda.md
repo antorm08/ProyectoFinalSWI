@@ -169,6 +169,13 @@ La serie tiene tres rasgos que explican el orden de la tabla:
 
 ## 8. Recomendación
 
+> **Ejecutada el 23 de noviembre de 2026.** El modelo activo es ya un estimador de perfil semanal. El protocolo de
+> [evaluacion_demanda.md](evaluacion_demanda.md), al incorporarlo como candidato servible, lo elige con un MAE
+> relativo de 0,822 frente al 0,866 del SARIMAX. Lo que ese documento añade y aquí no se veía: en el tramo reservado
+> el perfil falla más que el SARIMAX, porque esa ventana contiene un salto de nivel del +44 % y el sesgo al alza del
+> SARIMAX apuntaba por casualidad en la dirección correcta.
+
+
 **Sustituir el pronosticador puntual por un estimador de perfil semanal**, y hacerlo por el coste y la simplicidad tanto como por la precisión:
 
 - Mejora consistente de 3 a 4 pedidos/día (del 7 al 9 % del error), en seis variantes independientes y en una región ancha de parámetros.
@@ -179,7 +186,7 @@ La serie tiene tres rasgos que explican el orden de la tabla:
 
 **Qué no cambia:** la banda. La calibración empírica por bloques del horizonte es **independiente del modelo** —se construye con los errores que comete, sean de donde sean—, así que ya sirve para cualquier pronosticador. Es el trabajo que hace barato este cambio.
 
-**Qué haría falta:** enseñar al backend una familia de modelo nueva en `demand_model.py` (el artefacto guardaría el perfil y la ventana de nivel en vez de los parámetros de SARIMAX), sus pruebas, y volver a medir el tramo reservado con el modelo nuevo. Unas 100 líneas y una tarde.
+**Qué hizo falta:** una familia de modelo nueva en `demand_model.py` —el artefacto guarda siete factores de forma y un nivel en vez de los parámetros de SARIMAX—, separar el pronóstico puntual de la banda (la calibración necesita lo primero y el perfil se niega a emitir lo segundo sin calibrar), enseñar al servicio a extender ambas familias con datos nuevos, y 12 pruebas más. La familia `sarimax` no se retiró: sigue implementada y probada, de modo que volver atrás es cambiar una especificación en el informe.
 
 **Qué no recomiendo:** quedarse con `combinacion_horizonte` aunque encabece la tabla. Su punto de corte —cambiar de método en el día 7— salió de mirar estos mismos ocho orígenes, es el candidato con más riesgo de estar ajustado al banco, y es estadísticamente indistinguible de alternativas sin ningún parámetro elegido a posteriori.
 
