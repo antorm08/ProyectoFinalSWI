@@ -125,6 +125,15 @@ def coverage_window(
       misma). Solo puede dispararse a la baja, así que la rampa de crecimiento
       de 2017 no la activa.
 
+    El agotamiento del archivo es **gradual**, no un corte limpio: en Olist los
+    conteos caen durante una semana larga antes de llegar a cero. Un umbral
+    absoluto detecta el final del descenso, no su comienzo, y dejaría dentro
+    días ya infrarregistrados que un modelo interpretaría como caída de la
+    demanda. Por eso, tras localizar el corte, se retrocede mientras la media
+    móvil de 7 días siga bajando: se descarta el descenso final completo. La
+    marcha atrás está anclada al final de la serie, así que no puede recortar
+    un valle interior.
+
     Se devuelve la racha válida más larga; los recortes y sus motivos quedan en
     la auditoría.
     """
@@ -139,6 +148,16 @@ def coverage_window(
     suma7 = serie.rolling(PERIODO).sum()
     nivel = suma7.rolling(referencia).median().shift(PERIODO)
     truncado = (suma7 < fraccion * nivel).fillna(False)
+
+    descenso_desde = None
+    if truncado.any():
+        posicion = int(serie.index.get_loc(truncado[truncado].index[0]))
+        valores = suma7.to_numpy()
+        while posicion - 1 >= 0 and valores[posicion - 1] > valores[posicion]:
+            posicion -= 1
+        if posicion < len(serie):
+            descenso_desde = posicion
+            truncado.iloc[posicion:] = True
 
     invalido = pd.Series(False, index=serie.index)
     for desde, hasta in huecos:
@@ -174,6 +193,9 @@ def coverage_window(
         ],
         "first_truncated_day": (
             str(truncado[truncado].index[0].date()) if truncado.any() else None
+        ),
+        "final_descent_start": (
+            str(serie.index[descenso_desde].date()) if descenso_desde is not None else None
         ),
         "window": {
             "inicio": str(recorte.index[0].date()),

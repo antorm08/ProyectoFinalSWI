@@ -85,6 +85,31 @@ class VentanaDeCobertura(unittest.TestCase):
         self.assertLess(ventana.fin, serie.index[-30] + pd.Timedelta(days=PERIODO))
         self.assertGreater(ventana.audit["discarded"]["dias_despues"], 20)
 
+    def test_descarta_el_descenso_final_completo_no_solo_su_fondo(self):
+        """El archivo se agota poco a poco: en Olist cae 16 días hasta cero.
+
+        Un umbral absoluto encuentra el final del descenso, no su comienzo, y
+        dejaría dentro días ya infrarregistrados que el modelo leería como una
+        caída de la demanda. Lo que se exige no es acertar la fecha exacta de
+        inicio, sino que no sobreviva ningún día claramente infrarregistrado.
+        """
+        serie = serie_sintetica()
+        nivel = float(serie.iloc[-40:-16].mean())
+        serie.iloc[-16:] = np.linspace(0.85, 0.0, 16) * nivel
+        ventana = coverage_window(serie)
+        self.assertIsNotNone(ventana.audit["final_descent_start"])
+        self.assertLess(ventana.fin, serie.index[-1])
+        # Ningún día de la ventana queda por debajo de la mitad del nivel previo.
+        self.assertGreater(float(ventana.serie.iloc[-7:].min()), 0.5 * nivel)
+        self.assertGreater(ventana.audit["discarded"]["dias_despues"], 10)
+
+    def test_la_marcha_atras_no_recorta_un_valle_interior(self):
+        serie = serie_sintetica()
+        serie.iloc[200:210] = serie.iloc[200:210] * 0.35       # bajón interior, se recupera
+        ventana = coverage_window(serie)
+        self.assertIsNone(ventana.audit["final_descent_start"])
+        self.assertEqual(len(ventana.serie), len(serie))
+
     def test_un_dia_suelto_a_cero_no_es_un_hueco(self):
         serie = serie_sintetica()
         serie.iloc[300] = 0.0
