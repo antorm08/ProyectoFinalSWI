@@ -8,7 +8,9 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://localhost:5173",
-    channel: "msedge",
+    // msedge no existe en Linux; PW_CHANNEL=chromium permite correr el E2E ahí
+    // sin cambiar el valor por defecto que usa el resto del equipo en Windows.
+    channel: process.env.PW_CHANNEL ?? "msedge",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
