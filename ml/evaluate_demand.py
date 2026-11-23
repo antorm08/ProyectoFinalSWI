@@ -66,6 +66,13 @@ SERVIBLES = ("sarima_heredado", "sarimax_log_calendario")
 OBJETIVO_REL_MAE = 1.0            # el modelo debe batir a repetir la última semana
 OBJETIVO_COBERTURA_80 = (0.70, 0.90)
 
+#: Las cuatro combinaciones de escala y exógenas que se exploran. El AIC no es
+#: comparable entre escalas (las verosimilitudes no están en las mismas
+#: unidades), así que filtra **dentro** de cada familia y el backtesting decide
+#: entre ellas. De paso, la tabla de finalistas responde a dos preguntas que de
+#: otro modo quedarían en suposición: ¿aporta el log1p? ¿aporta el calendario?
+FAMILIAS = (("log1p", True), ("log1p", False), ("identidad", True), ("identidad", False))
+
 CODIGO = (
     "ml/evaluate_demand.py",
     "ml/demand_series.py",
@@ -144,12 +151,25 @@ def diferenciacion(serie: pd.Series) -> tuple[int, dict]:
     }
 
 
-def elegir_orden(train: pd.Series, *, rapido: bool = False) -> tuple[Especificacion, dict]:
-    """Rejilla pequeña por AIC, **solo sobre el primer origen de desarrollo**.
+def elegir_orden(particiones, *, rapido: bool = False, por_familia: int = 3) -> tuple[Especificacion, dict]:
+    """Selección en dos etapas sobre los orígenes de desarrollo.
 
-    El orden se congela aquí y se reutiliza en el resto de orígenes y en el
-    holdout: así el protocolo no se optimiza contra sus propias particiones.
+    1. **Filtro por AIC dentro de cada familia** (escala x exógenas), sobre el
+       primer origen: el AIC no es comparable entre escalas, así que se usa
+       donde sí vale, para quedarse con los `por_familia` órdenes más
+       verosímiles de cada una.
+    2. **Criterio por backtesting**: entre todos los finalistas gana el de
+       menor MAE relativo al naive estacional, promediado en los orígenes,
+       **exigiendo antes que su banda esté calibrada**. Un intervalo demasiado
+       ancho cubre mucho y no informa de nada.
+
+    La primera versión de este script elegía solo por AIC y el orden ganador
+    (2,1,2)(1,1,1) pronosticaba **peor** fuera de muestra que el heredado
+    (1,1,1)(1,0,1): 0,999 frente a 0,994 de MAE relativo. El AIC mide ajuste
+    dentro de la muestra, no capacidad de pronóstico, así que decide el
+    backtesting. El holdout final sigue sin tocarse.
     """
+    train = particiones[0][0]
     d, contraste = diferenciacion(train)
     pq = [(0, 0), (0, 1), (1, 0), (1, 1)] if rapido else [
         (p, q) for p in range(3) for q in range(3)
@@ -157,40 +177,82 @@ def elegir_orden(train: pd.Series, *, rapido: bool = False) -> tuple[Especificac
     estacionales = [(1, 0, 1)] if rapido else [
         (P, D, Q) for P in range(2) for D in range(2) for Q in range(2)
     ]
-    intentos = []
-    for p, q in pq:
-        for P, D, Q in estacionales:
-            spec = Especificacion(
-                order=(p, d, q), seasonal_order=(P, D, Q, PERIODO), transform="log1p", exog=True
-            )
-            if p == q == P == Q == 0 and d == D == 0:
-                continue
+    familias = FAMILIAS[:1] if rapido else FAMILIAS
+
+    rejilla, finalistas = [], []
+    for transform, exog in familias:
+        intentos = []
+        for p, q in pq:
+            for P, D, Q in estacionales:
+                if p == q == P == Q == 0 and d == D == 0:
+                    continue
+                spec = Especificacion(order=(p, d, q), seasonal_order=(P, D, Q, PERIODO),
+                                      transform=transform, exog=exog)
+                fila = {"order": list(spec.order), "seasonal_order": list(spec.seasonal_order),
+                        "transform": transform, "exog": exog}
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        resultados = ajustar(train, spec)
+                    aic = float(resultados.aic)
+                    intentos.append({**fila, "aic": aic, "convergio": convergio(resultados)}
+                                    if np.isfinite(aic) else {**fila, "error": "AIC no finito"})
+                except Exception as error:
+                    intentos.append({**fila, "error": str(error)[:120]})
+        validos = sorted((i for i in intentos if "aic" in i), key=lambda i: i["aic"])
+        rejilla.extend(intentos)
+        if not validos:
+            print(f"    familia {transform}/{'calendario' if exog else 'sin exógenas'}: sin ajustes válidos")
+            continue
+        preseleccion = validos[: max(1, por_familia if not rapido else 1)]
+        print(f"    familia {transform}/{'calendario' if exog else 'sin exógenas':14s} "
+              f"mejor AIC {validos[0]['aic']:9.1f}")
+        for candidato in preseleccion:
+            spec = Especificacion(order=tuple(candidato["order"]),
+                                  seasonal_order=tuple(candidato["seasonal_order"]),
+                                  transform=transform, exog=exog)
             try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    resultados = ajustar(train, spec)
-                intentos.append({
-                    "order": list(spec.order), "seasonal_order": list(spec.seasonal_order),
-                    "aic": float(resultados.aic), "convergio": convergio(resultados),
-                })
+                filas = [evaluar_origen(candidato_sarimax(spec), tr, te) for tr, te in particiones]
             except Exception as error:
-                intentos.append({
-                    "order": list(spec.order), "seasonal_order": list(spec.seasonal_order),
-                    "error": str(error)[:120],
-                })
-    validos = [i for i in intentos if "aic" in i and np.isfinite(i["aic"])]
-    if not validos:
-        raise RuntimeError("Ningún orden de la rejilla se pudo ajustar")
-    mejor = min(validos, key=lambda i: i["aic"])
-    spec = Especificacion(
-        order=tuple(mejor["order"]), seasonal_order=tuple(mejor["seasonal_order"]),
-        transform="log1p", exog=True,
-    )
+                finalistas.append({**candidato, "error_backtest": str(error)[:120]})
+                continue
+            resumen = agregar(filas)
+            finalistas.append({**candidato, "rel_mae": resumen["rel_mae"], "mae": resumen["mae"],
+                               "cobertura": resumen["cobertura"],
+                               "banda_media": resumen["banda_media"], "nombre": spec.nombre})
+            print(f"      {spec.nombre:46s} relMAE {resumen['rel_mae']:.3f} "
+                  f"cob {resumen['cobertura']:.3f}")
+
+    evaluables = [f for f in finalistas if "rel_mae" in f and np.isfinite(f["rel_mae"])]
+    if not evaluables:
+        raise RuntimeError("Ningún finalista se pudo evaluar en los orígenes de desarrollo")
+    calibrados = [f for f in evaluables
+                  if f["cobertura"] is not None
+                  and OBJETIVO_COBERTURA_80[0] <= f["cobertura"] <= OBJETIVO_COBERTURA_80[1]]
+    mejor = min(calibrados or evaluables, key=lambda f: f["rel_mae"])
+    mejor_aic = min((i for i in rejilla if "aic" in i), key=lambda i: i["aic"])
+    spec = Especificacion(order=tuple(mejor["order"]), seasonal_order=tuple(mejor["seasonal_order"]),
+                          transform=mejor["transform"], exog=mejor["exog"])
     detalle = {
+        "criterio": (
+            "el AIC filtra dentro de cada familia (escala x exógenas) y el backtesting decide "
+            "entre ellas: menor MAE relativo al naive estacional, exigiendo primero que la "
+            "cobertura de la banda del 80 % caiga en el rango objetivo"
+        ),
+        "familias": [{"transform": t, "exog": e} for t, e in familias],
         "contraste_diferenciacion": contraste,
-        "rejilla": sorted(intentos, key=lambda i: i.get("aic", float("inf"))),
-        "elegido": {"order": mejor["order"], "seasonal_order": mejor["seasonal_order"],
-                    "aic": mejor["aic"], "nombre": spec.nombre},
+        "rejilla_aic": sorted((i for i in rejilla if "aic" in i), key=lambda i: i["aic"]),
+        "errores_rejilla": [i for i in rejilla if "aic" not in i],
+        "finalistas": sorted(evaluables, key=lambda f: f["rel_mae"]),
+        "finalistas_calibrados": len(calibrados),
+        "elegido": {**{k: mejor[k] for k in ("order", "seasonal_order", "transform", "exog",
+                                             "aic", "rel_mae", "cobertura")}, "nombre": spec.nombre},
+        "mejor_por_aic": {k: mejor_aic[k] for k in ("order", "seasonal_order", "transform", "exog", "aic")},
+        "aic_y_backtest_coinciden": bool(
+            mejor["order"] == mejor_aic["order"]
+            and mejor["seasonal_order"] == mejor_aic["seasonal_order"]
+            and mejor["transform"] == mejor_aic["transform"] and mejor["exog"] == mejor_aic["exog"]
+        ),
         "ventana_de_eleccion": {
             "inicio": str(train.index[0].date()), "fin": str(train.index[-1].date()),
             "dias": int(len(train)),
@@ -350,8 +412,11 @@ def run(output: Path, *, rapido: bool = False) -> dict:
           f"({len(datos)} días, {int(datos.sum())} pedidos)")
     print(f"{len(particiones)} orígenes de desarrollo, horizonte {horizonte} días")
 
-    spec, seleccion_orden = elegir_orden(particiones[0][0], rapido=rapido)
-    print(f"Orden elegido por AIC: {spec.nombre} (AIC {seleccion_orden['elegido']['aic']:.1f})")
+    print("Eligiendo orden: AIC filtra, el backtesting decide")
+    spec, seleccion_orden = elegir_orden(particiones, rapido=rapido)
+    print(f"  elegido: {spec.nombre} (relMAE {seleccion_orden['elegido']['rel_mae']:.3f}, "
+          f"cobertura {seleccion_orden['elegido']['cobertura']:.3f}); "
+          f"el mejor por AIC {'coincide' if seleccion_orden['aic_y_backtest_coinciden'] else 'NO coincide'}")
 
     candidatos = {
         BASELINE: candidato_naive,
