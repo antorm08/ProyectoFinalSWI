@@ -17,6 +17,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
+from app.db import olist
 from app.main import app
 from app.services import demand_model as dm
 from app.services import demand_service
@@ -226,6 +227,68 @@ class ApiConModelo(unittest.TestCase):
         self.ruta.write_bytes(b"artefacto roto")
         _, despues = get(f"{RUTA}?horizonte=7")
         self.assertFalse(despues["modelo_entrenado"])
+
+
+class DatosPosterioresAlArtefacto(unittest.TestCase):
+    """El histórico no se queda congelado en el artefacto si hay días nuevos."""
+
+    def setUp(self):
+        self.serie = serie_demo()
+        self.fin = self.serie.index[-1]
+        self.carpeta = tempfile.TemporaryDirectory()
+        self.ruta = Path(self.carpeta.name) / "demand_model.joblib"
+        joblib.dump(bundle_demo(serie=self.serie), self.ruta)
+        self.parche = patch.object(demand_service, "DEMAND_MODEL", self.ruta)
+        self.parche.start()
+        demand_service._cache = None
+
+    def tearDown(self):
+        self.parche.stop()
+        demand_service._cache = None
+        self.carpeta.cleanup()
+
+    def pedidos(self, fechas, por_dia=200):
+        """Tabla de pedidos que, agregada por día, reproduce `fechas`."""
+        filas = [{"order_purchase_timestamp": f"{dia:%Y-%m-%d} 10:00:00"}
+                 for dia, n in fechas.items() for _ in range(int(n))]
+        return pd.DataFrame(filas)
+
+    def con_datos(self, tabla):
+        return patch.multiple(
+            olist, available=lambda nombre: True, load=lambda nombre: tabla
+        )
+
+    def test_anexa_los_dias_nuevos_sin_reajustar(self):
+        nuevos = pd.date_range(self.fin + pd.Timedelta(days=1), periods=5, freq="D")
+        completo = pd.concat([self.serie, pd.Series(210.0, index=nuevos)])
+        with self.con_datos(self.pedidos(completo.round().astype(int))):
+            _, cuerpo = get(f"{RUTA}?horizonte=7&historico=10")
+        self.assertTrue(cuerpo["modelo_entrenado"])
+        self.assertEqual(cuerpo["ancla"], str(nuevos[-1].date()))
+        futuros = [p for p in cuerpo["serie"] if p["tipo"] == "pronostico"]
+        self.assertEqual(futuros[0]["fecha"], str((nuevos[-1] + pd.Timedelta(days=1)).date()))
+        self.assertIsNotNone(futuros[0]["inferior"])
+
+    def test_no_anexa_si_la_continuacion_tiene_un_hueco(self):
+        nuevos = pd.date_range(self.fin + pd.Timedelta(days=2), periods=3, freq="D")  # salta un día
+        completo = pd.concat([self.serie, pd.Series(210.0, index=nuevos)])
+        with self.con_datos(self.pedidos(completo.round().astype(int))):
+            _, cuerpo = get(f"{RUTA}?horizonte=7&historico=10")
+        self.assertEqual(cuerpo["ancla"], str(self.fin.date()))
+
+    def test_no_anexa_un_dia_sin_pedidos(self):
+        nuevos = pd.date_range(self.fin + pd.Timedelta(days=1), periods=3, freq="D")
+        valores = pd.Series([210.0, 0.0, 205.0], index=nuevos)
+        completo = pd.concat([self.serie, valores])
+        with self.con_datos(self.pedidos(completo.round().astype(int))):
+            _, cuerpo = get(f"{RUTA}?horizonte=7&historico=10")
+        self.assertEqual(cuerpo["ancla"], str(self.fin.date()))
+
+    def test_sin_csv_disponibles_se_queda_en_el_historico_del_artefacto(self):
+        with patch.object(olist, "available", lambda nombre: False):
+            _, cuerpo = get(f"{RUTA}?horizonte=7&historico=10")
+        self.assertTrue(cuerpo["modelo_entrenado"])
+        self.assertEqual(cuerpo["ancla"], str(self.fin.date()))
 
 
 if __name__ == "__main__":
