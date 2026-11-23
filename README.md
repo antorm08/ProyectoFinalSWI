@@ -5,7 +5,7 @@ Plataforma web para analizar pedidos, entregas y satisfacción de clientes con 5
 | # | Componente (enunciado) | Problema real | Técnica | Datos |
 |---|---|---|---|---|
 | 1 | Predicción | Riesgo de retraso de un pedido | Gradient Boosting (scikit-learn) | Olist |
-| 2 | Series temporales | Demanda diaria de pedidos | SARIMAX con calendario + banda calibrada (statsmodels) | Olist |
+| 2 | Series temporales | Demanda diaria de pedidos | Perfil semanal × nivel + banda calibrada | Olist |
 | 3 | Clasificación de imágenes | Categorizar productos por foto | CNN (PyTorch) | Fashion-MNIST |
 | 4 | Clustering | Segmentar vendedores por desempeño | K-Means (scikit-learn) | Olist |
 | 5 | Resumen de texto | Resumir opiniones y reclamos | TextRank extractivo | Olist (reseñas) |
