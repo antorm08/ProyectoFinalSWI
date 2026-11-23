@@ -51,8 +51,11 @@ export interface DeliveryDurationOutput {
 }
 export interface ForecastPoint { fecha: string; valor: number; tipo: "historico" | "pronostico" }
 export interface DemandOutput { serie: ForecastPoint[]; modelo_entrenado: boolean }
+export interface ProductScore { categoria: string; confianza: number }
 export interface ProductOutput {
-  categoria: string; confianza: number; top3: { categoria: string; confianza: number }[]; modelo_entrenado: boolean;
+  categoria: string; confianza: number; top3: ProductScore[];
+  /** true si la confianza no alcanza el umbral validado: la categoría debe revisarse manualmente. */
+  baja_confianza: boolean; umbral_confianza: number; modelo_entrenado: boolean;
 }
 export interface SellerRow {
   seller_id?: string; cluster: number; etiqueta: string; n_pedidos: number; facturacion: number;

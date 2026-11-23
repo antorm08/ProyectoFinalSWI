@@ -86,10 +86,18 @@ class DemandOutput(BaseModel):
     modelo_entrenado: bool
 
 
+class ProductScore(BaseModel):
+    categoria: str
+    confianza: float = Field(..., ge=0, le=1)
+
+
 class ProductOutput(BaseModel):
     categoria: str
     confianza: float
-    top3: list[dict]
+    top3: list[ProductScore]
+    baja_confianza: bool = Field(
+        False, description="True si la confianza no alcanza el umbral validado: revisar la categoría manualmente")
+    umbral_confianza: float
     modelo_entrenado: bool
 
 

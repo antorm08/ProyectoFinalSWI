@@ -1,0 +1,301 @@
+{
+  "generated_at_utc": "2026-11-23T16:53:31.711258+00:00",
+  "artifact": {
+    "path": "backend/app/models/product_cnn.pt",
+    "sha256": "44aca28867b50caa2637b19a87aa0b92476f0e9ef1cea619b459026961e52129",
+    "coincide_con_entrenamiento": true
+  },
+  "versions": {
+    "torch": "2.15.0+cpu",
+    "numpy": "2.5.5"
+  },
+  "test": {
+    "n": 10000,
+    "accuracy": 0.9246,
+    "macro_f1": 0.92449,
+    "confusion_matrix": {
+      "labels": [
+        "Camiseta/top",
+        "Pantalón",
+        "Jersey",
+        "Vestido",
+        "Abrigo",
+        "Sandalia",
+        "Camisa",
+        "Zapatilla",
+        "Bolso",
+        "Botín"
+      ],
+      "rows_true_cols_pred": [
+        [
+          864,
+          0,
+          13,
+          9,
+          4,
+          2,
+          100,
+          0,
+          8,
+          0
+        ],
+        [
+          0,
+          991,
+          0,
+          6,
+          2,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          15,
+          0,
+          880,
+          10,
+          49,
+          0,
+          46,
+          0,
+          0,
+          0
+        ],
+        [
+          8,
+          2,
+          7,
+          931,
+          22,
+          0,
+          28,
+          0,
+          2,
+          0
+        ],
+        [
+          2,
+          0,
+          35,
+          26,
+          897,
+          0,
+          40,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          983,
+          0,
+          14,
+          0,
+          3
+        ],
+        [
+          87,
+          1,
+          53,
+          18,
+          72,
+          0,
+          766,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          5,
+          0,
+          982,
+          0,
+          13
+        ],
+        [
+          1,
+          1,
+          0,
+          4,
+          0,
+          1,
+          1,
+          1,
+          991,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0,
+          4,
+          0,
+          34,
+          0,
+          961
+        ]
+      ]
+    },
+    "top_confusiones": [
+      {
+        "real": "Camiseta/top",
+        "predicha": "Camisa",
+        "casos": 100
+      },
+      {
+        "real": "Camisa",
+        "predicha": "Camiseta/top",
+        "casos": 87
+      },
+      {
+        "real": "Camisa",
+        "predicha": "Abrigo",
+        "casos": 72
+      },
+      {
+        "real": "Camisa",
+        "predicha": "Jersey",
+        "casos": 53
+      },
+      {
+        "real": "Jersey",
+        "predicha": "Abrigo",
+        "casos": 49
+      },
+      {
+        "real": "Jersey",
+        "predicha": "Camisa",
+        "casos": 46
+      }
+    ],
+    "confianza_media_aciertos": 0.9486,
+    "confianza_media_errores": 0.6881
+  },
+  "umbrales_validacion": {
+    "n": 6000,
+    "seed": 42,
+    "tabla": [
+      {
+        "umbral": 0.5,
+        "cobertura": 0.9813,
+        "accuracy_cubiertas": 0.9378,
+        "accuracy_marcadas": 0.3929,
+        "errores_marcados": 0.1567
+      },
+      {
+        "umbral": 0.6,
+        "cobertura": 0.9452,
+        "accuracy_cubiertas": 0.9538,
+        "accuracy_marcadas": 0.4772,
+        "errores_marcados": 0.3963
+      },
+      {
+        "umbral": 0.7,
+        "cobertura": 0.901,
+        "accuracy_cubiertas": 0.9706,
+        "accuracy_marcadas": 0.537,
+        "errores_marcados": 0.6336
+      },
+      {
+        "umbral": 0.8,
+        "cobertura": 0.8618,
+        "accuracy_cubiertas": 0.9803,
+        "accuracy_marcadas": 0.5995,
+        "errores_marcados": 0.765
+      },
+      {
+        "umbral": 0.9,
+        "cobertura": 0.7978,
+        "accuracy_cubiertas": 0.9906,
+        "accuracy_marcadas": 0.6793,
+        "errores_marcados": 0.8963
+      }
+    ]
+  },
+  "umbrales_test_solo_descriptivo": [
+    {
+      "umbral": 0.5,
+      "cobertura": 0.9838,
+      "accuracy_cubiertas": 0.9328,
+      "accuracy_marcadas": 0.4259,
+      "errores_marcados": 0.1233
+    },
+    {
+      "umbral": 0.6,
+      "cobertura": 0.9438,
+      "accuracy_cubiertas": 0.9494,
+      "accuracy_marcadas": 0.5089,
+      "errores_marcados": 0.366
+    },
+    {
+      "umbral": 0.7,
+      "cobertura": 0.907,
+      "accuracy_cubiertas": 0.9621,
+      "accuracy_marcadas": 0.5591,
+      "errores_marcados": 0.5438
+    },
+    {
+      "umbral": 0.8,
+      "cobertura": 0.8589,
+      "accuracy_cubiertas": 0.9732,
+      "accuracy_marcadas": 0.6286,
+      "errores_marcados": 0.695
+    },
+    {
+      "umbral": 0.9,
+      "cobertura": 0.7863,
+      "accuracy_cubiertas": 0.9865,
+      "accuracy_marcadas": 0.6968,
+      "errores_marcados": 0.8594
+    }
+  ],
+  "robustez_backend": {
+    "n": 2000,
+    "pipeline": "app.services.product_service.preprocess",
+    "escenarios": {
+      "original_28px_fondo_negro": {
+        "accuracy": 0.927,
+        "confianza_media": 0.9276,
+        "confianza_media_en_errores": 0.6868
+      },
+      "catalogo_280px_fondo_blanco_jpeg": {
+        "accuracy": 0.92,
+        "confianza_media": 0.9147,
+        "confianza_media_en_errores": 0.662
+      },
+      "encuadre_amplio_prenda_50pct": {
+        "accuracy": 0.9205,
+        "confianza_media": 0.9149,
+        "confianza_media_en_errores": 0.6621
+      },
+      "encuadre_amplio_prenda_33pct": {
+        "accuracy": 0.9245,
+        "confianza_media": 0.9153,
+        "confianza_media_en_errores": 0.6749
+      },
+      "fondo_gris_ruido_prenda_50pct": {
+        "accuracy": 0.902,
+        "confianza_media": 0.905,
+        "confianza_media_en_errores": 0.6794
+      }
+    }
+  },
+  "graficos": [
+    "confianza_aciertos_errores.png",
+    "errores_mayor_confianza.png",
+    "matriz_confusion.png"
+  ]
+}

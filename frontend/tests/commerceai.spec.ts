@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { fileURLToPath } from "node:url";
 
 // Integración con la API local real: no se sustituyen resultados por métricas ficticias.
 const routes = [
@@ -178,19 +179,53 @@ test("demanda aplica horizonte sin solicitudes por cada movimiento", async ({ pa
 test("imágenes conserva multipart imagen y ejecuta inferencia", async ({ page }) => {
   await page.goto("/productos");
   const response = page.waitForResponse((res) => res.url().endsWith("/api/products/classify") && res.request().method() === "POST");
-  await page.getByLabel("Seleccionar imagen", { exact: true }).setInputFiles({
-    name: "imagen-diagnostico.png", mimeType: "image/png",
-    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a53cAAAAASUVORK5CYII=", "base64"),
-  });
+  // Botín del test de Fashion-MNIST sobre fondo blanco: la API rechaza (422) imágenes sin prenda visible.
+  await page.getByLabel("Seleccionar imagen", { exact: true }).setInputFiles(
+    fileURLToPath(new URL("./fixtures/prenda-botin.png", import.meta.url)));
   const res = await response;
   expect(res.status()).toBe(200);
   expect(res.request().headers()["content-type"]).toContain("multipart/form-data");
   // Chromium no siempre expone el cuerpo multipart. Un 200 de este endpoint
-  // confirma que FastAPI recibió el campo obligatorio `imagen` (otro nombre da 422).
-  expect(await res.json()).toMatchObject({ modelo_entrenado: true });
+  // confirma que FastAPI recibió el campo obligatorio `imagen`.
+  expect(await res.json()).toMatchObject({ modelo_entrenado: true, categoria: "Botín", baja_confianza: false });
   await expect(page.getByText("Categoría propuesta", { exact: true })).toBeVisible();
   const audit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(audit.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((node) => node.target) }))).toEqual([]);
+});
+
+test("imágenes de ejemplo se clasifican con la API real", async ({ page }) => {
+  await page.goto("/productos");
+  const response = page.waitForResponse((res) => res.url().endsWith("/api/products/classify") && res.request().method() === "POST");
+  await page.getByRole("button", { name: "Probar con el ejemplo: Bolso" }).click();
+  expect((await response).status()).toBe(200);
+  const result = page.getByRole("region", { name: "Resultado de clasificación" });
+  await expect(result.getByText("Categoría propuesta", { exact: true })).toBeVisible();
+  await expect(result.locator("p.text-2xl")).toHaveText("Bolso");
+  await expect(page.getByRole("img", { name: /ejemplo-bolso\.jpg/ })).toBeVisible();
+});
+
+test("imágenes avisa de baja confianza con una prenda ambigua real", async ({ page }) => {
+  await page.goto("/productos");
+  // Camisa del test de Fashion-MNIST que el modelo duda entre abrigo y camisa (confianza < 0,7).
+  await page.getByLabel("Seleccionar imagen", { exact: true }).setInputFiles(
+    fileURLToPath(new URL("./fixtures/prenda-ambigua.png", import.meta.url)));
+  await expect(page.getByText("Confianza baja: revisa la categoría")).toBeVisible();
+  await expect(page.getByText(/no alcanza el umbral validado de 70/)).toBeVisible();
+  const audit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(audit.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((node) => node.target) }))).toEqual([]);
+});
+
+test("imágenes sin prenda visible muestran el error de la API", async ({ page }) => {
+  await page.goto("/productos");
+  const response = page.waitForResponse((res) => res.url().endsWith("/api/products/classify"));
+  // PNG válido de 1×1 px: imagen lisa, sin prenda distinguible del fondo.
+  await page.getByLabel("Seleccionar imagen", { exact: true }).setInputFiles({
+    name: "imagen-lisa.png", mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a53cAAAAASUVORK5CYII=", "base64"),
+  });
+  expect((await response).status()).toBe(422);
+  await expect(page.getByText(/No se distingue ninguna prenda del fondo/)).toBeVisible();
+  await expect(page.getByText("Categoría propuesta", { exact: true })).toHaveCount(0);
 });
 
 test("reseñas conserva texto, extensión y cambio de modalidad", async ({ page }) => {
