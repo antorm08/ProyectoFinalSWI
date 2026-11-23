@@ -14,6 +14,7 @@ def health():
         "datos_olist": {name: olist.available(name) for name in olist.FILES},
         "modelos": {
             "retraso": config.DELAY_MODEL.exists(),
+            "tiempo_entrega": config.DELIVERY_DURATION_MODEL.is_file(),
             "demanda": config.DEMAND_MODEL.exists(),
             "productos": config.PRODUCT_MODEL.exists(),
             "vendedores": config.SELLER_MODEL.exists(),

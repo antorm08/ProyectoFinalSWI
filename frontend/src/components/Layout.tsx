@@ -5,7 +5,7 @@ import { useSystem } from "./SystemContext";
 
 const links: { to: string; label: string; icon: IconName }[] = [
   { to: "/", label: "Dashboard ejecutivo", icon: "grid" },
-  { to: "/retrasos", label: "Riesgo de entregas", icon: "shield" },
+  { to: "/retrasos", label: "Tiempo de entrega", icon: "shield" },
   { to: "/demanda", label: "Pronóstico de demanda", icon: "chart" },
   { to: "/productos", label: "Clasificación visual", icon: "image" },
   { to: "/vendedores", label: "Segmentación de vendedores", icon: "users" },

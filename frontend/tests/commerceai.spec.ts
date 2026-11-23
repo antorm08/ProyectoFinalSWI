@@ -4,7 +4,7 @@ import AxeBuilder from "@axe-core/playwright";
 // Integración con la API local real: no se sustituyen resultados por métricas ficticias.
 const routes = [
   ["/", "Dashboard ejecutivo"],
-  ["/retrasos", "Riesgo de entregas"],
+  ["/retrasos", "Tiempo de entrega"],
   ["/demanda", "Pronóstico de demanda"],
   ["/productos", "Clasificación visual"],
   ["/vendedores", "Segmentación de vendedores"],
@@ -50,22 +50,70 @@ test("navegación por teclado y cierre del menú móvil", async ({ page }) => {
   }
 });
 
-test("retrasos conserva el contrato y retira resultados al editar", async ({ page }) => {
+test("ETA ejecuta el modelo real sin plazo prometido y calcula llegada desde compra", async ({ page }, info) => {
   await page.goto("/retrasos");
-  await page.getByLabel("Precio total (BRL)").fill("175");
-  const response = page.waitForResponse((res) => res.url().endsWith("/api/delay/predict") && res.request().method() === "POST");
-  await page.getByRole("button", { name: "Evaluar riesgo de entrega" }).click();
+  await expect(page.getByLabel(/Plazo prometido/)).toHaveCount(0);
+  await page.getByLabel("Fecha de compra (opcional)").fill("2018-08-06");
+  const response = page.waitForResponse((res) => res.url().endsWith("/api/delay/predict-duration") && res.request().method() === "POST");
+  await page.getByRole("button", { name: "Estimar tiempo de entrega" }).click();
   const res = await response;
   expect(res.status()).toBe(200);
-  expect(res.request().postDataJSON()).toEqual({ precio: 175, flete: 20, peso_g: 1500, n_items: 1, dias_estimados: 20, estado_cliente: "RJ", estado_vendedor: "SP", mes: 11, dia_semana: 0 });
-  if (!(await res.json()).modelo_entrenado) {
-    await expect(page.getByText("Estimación orientativa", { exact: true })).toHaveCount(1);
-    await expect(page.getByText(/no una predicción validada/)).toBeVisible();
-  }
-  await expect(page.getByText("Probabilidad de retraso", { exact: true })).toBeVisible();
+  expect(res.request().postDataJSON()).toEqual({ precio: 120, flete: 20, peso_g: 1500, n_items: 1, estado_cliente: "RJ", estado_vendedor: "SP", fecha_compra: "2018-08-06" });
+  const body = await res.json();
+  expect(body).toMatchObject({ experimental: true, modelo: "HistGradientBoostingRegressor", fecha_llegada_estimada: "2018-08-16", mae_desarrollo_dias: 4.60, mae_agosto_retrospectivo_dias: 3.31 });
+  expect(body.dias_entrega_estimados).toBeCloseTo(10.90887913, 7);
+  expect(body).not.toHaveProperty("probabilidad_retraso");
+  await expect(page.getByText("10,91 días", { exact: true })).toBeVisible();
+  await expect(page.locator("time")).toHaveAttribute("datetime", "2018-08-16");
+  await expect(page.getByText("Modelo experimental", { exact: true })).toBeVisible();
+  await expect(page.getByText(/no un intervalo de confianza/)).toBeVisible();
+  await expect(page.getByText("Menor fiabilidad en entregas prolongadas")).toBeVisible();
+  const audit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(audit.violations).toEqual([]);
+  await page.screenshot({ path: info.outputPath("prediccion-real-eta.png"), fullPage: true });
   await page.getByLabel("Precio total (BRL)").fill("200");
-  await expect(page.getByText("Listo para evaluar", { exact: true })).toBeVisible();
-  await expect(page.getByText("Probabilidad de retraso", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Listo para estimar", { exact: true })).toBeVisible();
+  await expect(page.locator("time")).toHaveCount(0);
+});
+
+test("ETA permite predecir solo duración sin inventar fecha", async ({ page }, info) => {
+  await page.goto("/retrasos");
+  await expect(page.getByLabel("Fecha de compra (opcional)")).toHaveValue("");
+  await page.getByLabel("Mes de compra", { exact: true }).selectOption("8");
+  await page.getByLabel("Día de la semana de compra").selectOption("0");
+  const response = page.waitForResponse((res) => res.url().endsWith("/api/delay/predict-duration") && res.request().method() === "POST");
+  await page.getByRole("button", { name: "Estimar tiempo de entrega" }).click();
+  const res = await response;
+  expect(res.status()).toBe(200);
+  expect(res.request().postDataJSON()).toMatchObject({ mes: 8, dia_semana: 0 });
+  expect(res.request().postDataJSON()).not.toHaveProperty("fecha_compra");
+  expect((await res.json()).fecha_llegada_estimada).toBeNull();
+  await expect(page.getByText("10,91 días", { exact: true })).toBeVisible();
+  await expect(page.getByText("No disponible sin fecha de compra")).toBeVisible();
+  await expect(page.locator("time")).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("prediccion-real-sin-fecha.png"), fullPage: true });
+});
+
+test("ETA comunica 503 sin mostrar una estimación falsa", async ({ page }) => {
+  await page.route("**/api/delay/predict-duration", (route) => route.fulfill({
+    status: 503, json: { detail: "Modelo de tiempo de entrega no disponible. No se generó una estimación." },
+  }));
+  await page.goto("/retrasos");
+  await page.getByLabel("Fecha de compra (opcional)").fill("2018-08-06");
+  await page.getByRole("button", { name: "Estimar tiempo de entrega" }).click();
+  await expect(page.getByRole("alert")).toContainText("Modelo de tiempo de entrega no disponible");
+  await expect(page.getByText("Tiempo estimado desde la compra", { exact: true })).toHaveCount(0);
+});
+
+test("clasificación histórica conserva su endpoint y contrato", async ({ request }) => {
+  const res = await request.post("http://localhost:8000/api/delay/predict", {
+    data: { precio: 175, flete: 20, peso_g: 1500, n_items: 1, dias_estimados: 20, estado_cliente: "RJ", estado_vendedor: "SP", mes: 11, dia_semana: 0 },
+  });
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(Object.keys(body).sort()).toEqual(["modelo_entrenado", "nivel_riesgo", "probabilidad_retraso"]);
+  expect(body.probabilidad_retraso).toBeGreaterThanOrEqual(0);
+  expect(body.probabilidad_retraso).toBeLessThanOrEqual(1);
 });
 
 test("dashboard mantiene los indicadores técnicos en una sección secundaria", async ({ page }) => {
@@ -182,17 +230,18 @@ test("una respuesta tardía no restaura un resultado de un escenario editado", a
   const gate = new Promise<void>((resolve) => { release = resolve; });
   let reached!: () => void;
   const fetched = new Promise<void>((resolve) => { reached = resolve; });
-  await page.route("**/api/delay/predict", async (route) => {
+  await page.route("**/api/delay/predict-duration", async (route) => {
     const response = await route.fetch();
     reached();
     await gate;
     try { await route.fulfill({ response }); } catch { /* La edición cancela la solicitud. */ }
   });
   await page.goto("/retrasos");
-  await page.getByRole("button", { name: "Evaluar riesgo de entrega" }).click();
+  await page.getByLabel("Fecha de compra (opcional)").fill("2018-08-06");
+  await page.getByRole("button", { name: "Estimar tiempo de entrega" }).click();
   await fetched;
   await page.getByLabel("Precio total (BRL)").fill("300");
   release();
-  await expect(page.getByText("Listo para evaluar", { exact: true })).toBeVisible();
-  await expect(page.getByText("Probabilidad de retraso", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Listo para estimar", { exact: true })).toBeVisible();
+  await expect(page.getByText("Tiempo estimado desde la compra", { exact: true })).toHaveCount(0);
 });

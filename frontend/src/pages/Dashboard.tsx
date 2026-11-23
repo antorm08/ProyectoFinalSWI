@@ -8,7 +8,7 @@ import { useApiQuery } from "../hooks/useApi";
 import { date, number } from "../utils/format";
 
 const modules: { key: string; to: string; title: string; technique: string; description: string; icon: IconName }[] = [
-  { key: "retraso", to: "/retrasos", title: "Riesgo de entregas", technique: "Gradient Boosting", description: "Evalúa el riesgo de retraso de un pedido.", icon: "shield" },
+  { key: "tiempo_entrega", to: "/retrasos", title: "Tiempo de entrega", technique: "HistGradientBoosting · experimental", description: "Estima los días desde la compra hasta la entrega de un pedido.", icon: "shield" },
   { key: "demanda", to: "/demanda", title: "Pronóstico de demanda", technique: "SARIMA", description: "Consulta el volumen diario previsto.", icon: "chart" },
   { key: "productos", to: "/productos", title: "Clasificación visual", technique: "CNN · Fashion-MNIST", description: "Clasifica imágenes de prendas y accesorios.", icon: "image" },
   { key: "vendedores", to: "/vendedores", title: "Segmentación de vendedores", technique: "K-Means", description: "Compara desempeño comercial y logístico.", icon: "users" },
@@ -22,7 +22,7 @@ export default function Dashboard() {
   const forecast = useApiQuery(loadForecast);
   const future = forecast.data?.serie.filter((point) => point.tipo === "pronostico") ?? [];
   const total = future.reduce((sum, point) => sum + point.valor, 0);
-  const models = system.data ? ["retraso", "demanda", "productos", "vendedores"].filter((key) => system.data!.modelos[key]).length : null;
+  const models = system.data ? ["tiempo_entrega", "demanda", "productos", "vendedores"].filter((key) => system.data!.modelos[key]).length : null;
   const available = system.data ? Object.values(system.data.datos_olist).filter(Boolean).length : null;
   return <>
     <PageHeader title="Dashboard ejecutivo" eyebrow="Visión general" subtitle="Demanda prevista y herramientas para tus operaciones." actions={<Link className="btn-secondary" to="/demanda">Explorar demanda<Icon name="arrow" className="h-4 w-4" /></Link>} />

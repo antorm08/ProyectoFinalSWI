@@ -17,6 +17,7 @@ CORS_ORIGINS = [
 
 # Nombres de los artefactos generados por los scripts de ml/
 DELAY_MODEL = MODELS_DIR / "delay_model.joblib"
+DELIVERY_DURATION_MODEL = MODELS_DIR / "delivery_regression_experimental.joblib"
 DEMAND_MODEL = MODELS_DIR / "demand_model.joblib"
 PRODUCT_MODEL = MODELS_DIR / "product_cnn.pt"
 SELLER_MODEL = MODELS_DIR / "seller_kmeans.joblib"

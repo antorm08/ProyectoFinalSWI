@@ -37,6 +37,18 @@ export interface DelayInput {
   estado_cliente: string; estado_vendedor: string; mes: number; dia_semana: number;
 }
 export interface DelayOutput { probabilidad_retraso: number; nivel_riesgo: string; modelo_entrenado: boolean }
+export type DeliveryDurationInput = Pick<DelayInput, "precio" | "flete" | "peso_g" | "n_items" | "estado_cliente" | "estado_vendedor"> & (
+  { fecha_compra: string; mes?: never; dia_semana?: never } |
+  { fecha_compra?: never; mes: number; dia_semana: number }
+);
+export interface DeliveryDurationOutput {
+  dias_entrega_estimados: number;
+  fecha_llegada_estimada: string | null;
+  modelo: string;
+  experimental: boolean;
+  mae_desarrollo_dias: number;
+  mae_agosto_retrospectivo_dias: number;
+}
 export interface ForecastPoint { fecha: string; valor: number; tipo: "historico" | "pronostico" }
 export interface DemandOutput { serie: ForecastPoint[]; modelo_entrenado: boolean }
 export interface ProductOutput {
@@ -53,6 +65,8 @@ export interface SummaryOutput { resumen: string; oraciones_originales: number; 
 export const api = {
   health: (signal?: AbortSignal) => request<Health>("/health", { signal }),
   predictDelay: (d: DelayInput, signal?: AbortSignal) => request<DelayOutput>("/delay/predict", { ...json(d), signal }),
+  predictDeliveryDuration: (d: DeliveryDurationInput, signal?: AbortSignal) =>
+    request<DeliveryDurationOutput>("/delay/predict-duration", { ...json(d), signal }),
   forecast: (horizonte: number, historico = 90, signal?: AbortSignal) =>
     request<DemandOutput>(`/demand/forecast?horizonte=${horizonte}&historico=${historico}`, { signal }),
   classifyProduct: (file: File, signal?: AbortSignal) => {

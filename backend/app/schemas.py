@@ -1,5 +1,8 @@
 """Esquemas de entrada/salida de la API (Pydantic)."""
-from pydantic import BaseModel, Field
+import re
+from datetime import date
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class DelayInput(BaseModel):
@@ -18,6 +21,58 @@ class DelayOutput(BaseModel):
     probabilidad_retraso: float
     nivel_riesgo: str
     modelo_entrenado: bool
+
+
+BRAZIL_STATES = frozenset("AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".split())
+
+
+class DeliveryDurationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    precio: float = Field(ge=0, strict=True, description="Precio total en BRL")
+    flete: float = Field(ge=0, strict=True, description="Flete total en BRL")
+    peso_g: float = Field(ge=0, strict=True, description="Peso total en gramos; 0 indica peso desconocido")
+    n_items: int = Field(ge=1, strict=True)
+    estado_cliente: str
+    estado_vendedor: str = Field(description="Estado representativo del origen del pedido")
+    fecha_compra: date | None = Field(default=None, description="Fecha local de compra, YYYY-MM-DD")
+    mes: int | None = Field(default=None, ge=1, le=12, strict=True)
+    dia_semana: int | None = Field(default=None, ge=0, le=6, strict=True, description="0 = lunes")
+
+    @field_validator("estado_cliente", "estado_vendedor")
+    @classmethod
+    def normalize_state(cls, value: str) -> str:
+        state = value.strip().upper()
+        if state not in BRAZIL_STATES:
+            raise ValueError("Usa una sigla de estado de Brasil")
+        return state
+
+    @field_validator("fecha_compra", mode="before")
+    @classmethod
+    def validate_date_format(cls, value):
+        if value is None or type(value) is date:
+            return value
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            raise ValueError("Usa una fecha local en formato YYYY-MM-DD")
+        return value
+
+    @model_validator(mode="after")
+    def validate_purchase_calendar(self):
+        if self.fecha_compra is None:
+            if self.mes is None or self.dia_semana is None:
+                raise ValueError("Sin fecha de compra, indica el mes y el día de la semana")
+        elif self.mes is not None or self.dia_semana is not None:
+            raise ValueError("Indica la fecha de compra o el mes y día de la semana, no ambos")
+        return self
+
+
+class DeliveryDurationOutput(BaseModel):
+    dias_entrega_estimados: float = Field(ge=0, allow_inf_nan=False)
+    fecha_llegada_estimada: date | None
+    modelo: str
+    experimental: bool
+    mae_desarrollo_dias: float
+    mae_agosto_retrospectivo_dias: float
 
 
 class ForecastPoint(BaseModel):
