@@ -31,6 +31,9 @@ PERIODO = 7
 
 TRANSFORMACIONES = ("log1p", "identidad")
 
+#: Días por bloque de la calibración empírica de la banda.
+BLOQUE_DIAS = 7
+
 
 class BundleIncompatible(Exception):
     """El artefacto no se puede usar: formato, columnas o contenido inesperados."""
@@ -153,25 +156,62 @@ def reconstruir(serie: pd.Series, spec: Especificacion, params: np.ndarray):
     return modelo.smooth(params)
 
 
+def banda_calibrada(valores: np.ndarray, calibracion: dict, nivel: float):
+    """Banda a partir de los errores observados en el backtesting, no de la teoría.
+
+    El intervalo que publica statsmodels asume que el modelo es correcto y que
+    los residuos se comportan; medido sobre Olist, ninguna especificación
+    cumplía las dos cosas a la vez (ver docs/evaluacion_demanda.md). Aquí la
+    banda se construye con los **cuantiles empíricos del error relativo**
+    observado a cada distancia del origen, agrupados por bloques de
+    `bloque_dias`. Así la cobertura es la medida, no la supuesta, y crece con
+    el horizonte porque los errores crecen.
+
+    Guarda los errores en bruto, no cuantiles precalculados, para poder servir
+    cualquier nivel de confianza que se pida.
+    """
+    bloques = calibracion.get("errores_relativos")
+    if not bloques:
+        raise BundleIncompatible("La calibración no trae errores relativos")
+    tam = int(calibracion.get("bloque_dias", BLOQUE_DIAS))
+    if tam < 1:
+        raise BundleIncompatible("Tamaño de bloque inválido en la calibración")
+    bajo, alto = (1 - nivel) / 2, (1 + nivel) / 2
+    cuantiles = []
+    for errores in bloques:
+        muestra = np.asarray(errores, dtype=float)
+        if muestra.size == 0:
+            raise BundleIncompatible("Un bloque de calibración está vacío")
+        cuantiles.append((float(np.quantile(muestra, bajo)), float(np.quantile(muestra, alto))))
+    indices = np.minimum(np.arange(len(valores)) // tam, len(cuantiles) - 1)
+    inferior = np.array([valores[i] * (1 + cuantiles[b][0]) for i, b in enumerate(indices)])
+    superior = np.array([valores[i] * (1 + cuantiles[b][1]) for i, b in enumerate(indices)])
+    return np.maximum(inferior, 0.0), np.maximum(superior, inferior)
+
+
 def pronosticar(
-    resultados, serie: pd.Series, spec: Especificacion, steps: int, nivel: float = 0.8
+    resultados, serie: pd.Series, spec: Especificacion, steps: int, nivel: float = 0.8,
+    calibracion: dict | None = None,
 ) -> pd.DataFrame:
-    """Pronóstico y banda, en pedidos por día, con índice de fechas futuras."""
+    """Pronóstico y banda, en pedidos por día, con índice de fechas futuras.
+
+    Con `calibracion` la banda sale de los errores medidos; sin ella, del
+    intervalo teórico del modelo.
+    """
     if steps < 1:
         raise ValueError("steps debe ser al menos 1")
     if not 0.5 <= nivel < 1:
         raise ValueError("El nivel de confianza debe estar en [0,5, 1)")
     futuro = pd.date_range(serie.index[-1] + pd.Timedelta(days=1), periods=steps, freq="D")
     salida = resultados.get_forecast(steps=steps, exog=_exog(futuro, spec))
-    banda = salida.conf_int(alpha=1 - nivel).to_numpy()
-    marco = pd.DataFrame(
-        {
-            "valor": destransformar(salida.predicted_mean.to_numpy(), spec.transform),
-            "inferior": destransformar(banda[:, 0], spec.transform),
-            "superior": destransformar(banda[:, 1], spec.transform),
-        },
-        index=futuro,
-    )
+    valor = destransformar(salida.predicted_mean.to_numpy(), spec.transform)
+    if calibracion:
+        inferior, superior = banda_calibrada(valor, calibracion, nivel)
+    else:
+        banda = salida.conf_int(alpha=1 - nivel).to_numpy()
+        inferior = destransformar(banda[:, 0], spec.transform)
+        superior = destransformar(banda[:, 1], spec.transform)
+    marco = pd.DataFrame({"valor": valor, "inferior": inferior, "superior": superior}, index=futuro)
     marco["inferior"] = marco["inferior"].clip(lower=0.0)
     return marco
 
@@ -182,15 +222,18 @@ def pronosticar(
 CLAVES = ("schema", "spec", "params", "history", "exog_columns")
 
 
-def empaquetar(serie: pd.Series, spec: Especificacion, resultados, **extra: Any) -> dict:
+def empaquetar(serie: pd.Series, spec: Especificacion, resultados,
+               calibracion: dict | None = None, **extra: Any) -> dict:
     """Bundle listo para `joblib.dump`, con la comprobación de ida y vuelta dentro."""
-    comprobacion = pronosticar(resultados, serie, spec, steps=PERIODO, nivel=0.8)
+    comprobacion = pronosticar(resultados, serie, spec, steps=PERIODO, nivel=0.8,
+                               calibracion=calibracion)
     return {
         "schema": ESQUEMA,
         "spec": spec.a_dict(),
         "params": np.asarray(resultados.params, dtype=float),
         "history": serie,
         "exog_columns": list(EXOG_COLUMNAS) if spec.exog else [],
+        "calibration": calibracion,
         "forecast_check": {
             "steps": PERIODO,
             "nivel": 0.8,
@@ -221,6 +264,12 @@ def desempaquetar(bundle: Any) -> tuple[pd.Series, Especificacion, Any]:
         spec = Especificacion.desde_dict(bundle["spec"])
     except (KeyError, TypeError, ValueError) as error:
         raise BundleIncompatible(f"Especificación inválida: {error}") from error
+    calibracion = bundle.get("calibration")
+    if calibracion is not None:
+        if not isinstance(calibracion, dict) or not calibracion.get("errores_relativos"):
+            raise BundleIncompatible("La calibración del artefacto está mal formada")
+        if any(len(bloque) == 0 for bloque in calibracion["errores_relativos"]):
+            raise BundleIncompatible("La calibración trae algún bloque vacío")
     esperadas = list(EXOG_COLUMNAS) if spec.exog else []
     if list(bundle["exog_columns"]) != esperadas:
         raise BundleIncompatible(
@@ -254,7 +303,8 @@ def verificar(bundle: dict, tolerancia: float = 1e-6) -> dict:
     if not guardado:
         raise BundleIncompatible("El artefacto no trae comprobación de ida y vuelta")
     serie, spec, resultados = desempaquetar(bundle)
-    vuelta = pronosticar(resultados, serie, spec, steps=guardado["steps"], nivel=guardado["nivel"])
+    vuelta = pronosticar(resultados, serie, spec, steps=guardado["steps"], nivel=guardado["nivel"],
+                         calibracion=bundle.get("calibration"))
     desvios = {}
     for columna in ("valor", "inferior", "superior"):
         desvio = float(np.max(np.abs(vuelta[columna].to_numpy() - np.asarray(guardado[columna]))))
