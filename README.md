@@ -8,7 +8,7 @@ Plataforma web para analizar pedidos, entregas y satisfacción de clientes con 5
 | 2 | Series temporales | Demanda diaria de pedidos | SARIMA (statsmodels) | Olist |
 | 3 | Clasificación de imágenes | Categorizar productos por foto | CNN (PyTorch) | Fashion-MNIST |
 | 4 | Clustering | Segmentar vendedores por desempeño | K-Means (scikit-learn) | Olist |
-| 5 | Resumen de texto | Resumir opiniones y reclamos | TextRank extractivo | Olist (reseñas) |
+| 5 | Resumen de texto | Resumir opiniones y reclamos | TextRank ponderado + MMR (extractivo) y temas por léxico | Olist (reseñas) |
 
 ## Arquitectura
 
@@ -40,6 +40,7 @@ commerceai/
 │       ├── db/olist.py     carga de los CSV de Olist
 │       └── models/         artefactos entrenados (generados por ml/)
 ├── ml/                 entrenamiento: train_delay, train_demand, train_products, train_sellers
+│                       evaluación: evaluate_* (p. ej. evaluate_reviews: resumen de reseñas)
 ├── frontend/           React + TypeScript (una página por componente)
 ├── data/               datasets (no se suben a git)
 ├── docs/               manuales e informe técnico
@@ -68,6 +69,8 @@ python train_delay.py
 python train_demand.py
 python train_products.py
 python train_sellers.py
+# El resumen de reseñas no requiere entrenamiento. Su evaluación (opcional):
+python evaluate_reviews.py        # → docs/evaluacion_resumen.md
 
 # 3) Frontend (otra terminal)
 cd frontend

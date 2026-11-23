@@ -98,6 +98,96 @@ accesibilidad.
 
 #### 2.4.4 Clustering – métricas por vendedor, K-Means, elección de k (codo, silhouette)
 #### 2.4.5 Resumen de texto – TextRank, ejemplos de resúmenes
+
+**Problema.** Un marketplace acumula miles de reseñas y nadie puede leerlas todas. El componente resume **qué reclaman y
+qué valoran los clientes** de un vendedor, de una categoría o de toda la plataforma, para que el equipo comercial sepa
+dónde actuar (por ejemplo, un vendedor cuyos reclamos hablan sobre todo de productos distintos al anuncio).
+
+**Datos.** `olist_order_reviews_dataset.csv` (Olist, §2.5): 99 224 reseñas reales, de las cuales 40 950 tienen comentario
+en portugués. Son textos cortos (mediana de 53 caracteres, 1,2 oraciones útiles por comentario) y muy repetitivos: el
+12 % de las oraciones aparecen literalmente en otras reseñas. No hace falta extraer datos de la web: el dataset ya trae
+las reseñas, su nota (1–5) y el pedido al que pertenecen, que se une con vendedores y categorías.
+
+**Método** (`backend/app/services/summary_service.py`, sin entrenamiento):
+
+1. **Limpieza y segmentación.** Se corrigen saltos de línea y puntuación pegada (“iguais.Paguei”), se divide en oraciones,
+   se descartan las de menos de 3 palabras (“Muito bom”) y se agrupan las que son iguales salvo tildes, mayúsculas o
+   puntuación. Cada oración conserva **cuántas reseñas la contienen**.
+2. **Reclamos y elogios.** Se separan por la nota real del cliente: reclamos (1–2) y elogios (4–5).
+3. **Selección de frases: TextRank ponderado + MMR.** Las oraciones se representan con TF-IDF de n-gramas de caracteres
+   (3–5), que toleran faltas de ortografía y variaciones de palabras del portugués. Sobre el grafo de similitud (coseno)
+   se calcula PageRank con salto aleatorio proporcional a la frecuencia, de modo que lo que dicen muchos clientes pesa más.
+   Después, **MMR** (*Maximal Marginal Relevance*, λ = 0,7) elige frases relevantes pero distintas entre sí, y un umbral
+   de similitud (0,6) descarta paráfrasis. Para grupos grandes, solo entran al grafo las 400 oraciones más centrales.
+4. **Temas.** Un léxico en portugués y español (insensible a tildes) marca 10 temas: plazo de entrega, pedido no recibido,
+   pedido incompleto, fidelidad al anuncio, calidad, atención al cliente, cambios y devoluciones, embalaje, precio y
+   satisfacción. Se calcula el porcentaje de reclamos que menciona cada tema y se compara con la media de la plataforma.
+5. **Resumen ejecutivo en español**, armado con plantillas a partir de los indicadores (nota media, % de reclamos frente a
+   la plataforma, temas principales y el tema que más se desvía de la media). No traduce ni inventa contenido.
+
+**Por qué este enfoque.** Las reseñas están en portugués, son cortas y no existen resúmenes de referencia para entrenar un
+modelo supervisado. Un modelo abstractivo (mT5 o un LLM) necesitaría GPU o una API externa y podría inventar afirmaciones.
+El enfoque extractivo cita frases reales (con su número de repeticiones), responde en menos de medio segundo en CPU y es
+auditable. El servicio mantiene la misma interfaz si en el futuro se sustituye por un modelo abstractivo.
+
+**Evaluación** (`ml/evaluate_reviews.py` → `docs/evaluacion_resumen.md`). Al no haber resúmenes humanos de referencia, se
+evaluó de dos formas reproducibles:
+
+- **Los temas se validan con hechos de los pedidos que el texto no conoce.** Entre los reclamos, los marcados como
+  *pedido no recibido* corresponden a pedidos que realmente no se habían entregado cuando se escribió la reseña en el
+  67,8 % de los casos, frente al 26,1 % del resto (*lift* 2,59). Los marcados como *plazo de entrega* llegaron después
+  de la fecha estimada en el 44,9 % de los casos, frente al 21,4 % (*lift* 2,10). Los controles (temas sin relación con
+  la entrega) no muestran ese efecto (*lift* 0,15–0,38).
+- **El método de resumen se compara con alternativas** sobre 120 grupos (reclamos y elogios de los 60 vendedores con más
+  reseñas). Las métricas usan una representación por palabras distinta de la del método:
+
+| Método (5 frases) | Cobertura de contenido ↑ | Reseñas representadas ↑ | Temas principales cubiertos ↑ | Redundancia ↓ |
+|---|---:|---:|---:|---:|
+| Frases al azar | 0,533 | 12,0 % | 59,9 % | 0,065 |
+| Más frecuentes | 0,574 | 15,1 % | 59,3 % | 0,096 |
+| Centroide TF-IDF | 0,771 | 18,9 % | 60,1 % | 0,453 |
+| TextRank clásico | 0,774 | 18,8 % | 60,4 % | 0,429 |
+| **TextRank ponderado + MMR (elegido)** | **0,790** | **20,0 %** | **73,6 %** | 0,305 |
+
+El método elegido supera a TextRank clásico en todas las métricas de cobertura y reduce la redundancia: sin MMR, los cinco
+reclamos “más representativos” de la plataforma son cinco formas de escribir “não recebi o produto”. El coste es que elige
+frases algo más largas (13,1 frente a 10,7 palabras). Las frases al azar repiten menos solo porque no tienen relación
+entre sí, pero cubren mucho menos contenido.
+
+**Ejemplo** (toda la plataforma, 5 frases por sección):
+
+> Se analizaron 99.224 reseñas (40.950 con comentario), con una nota media de 4,1 sobre 5. El 15% son reclamos (nota 1–2)
+> y el 77% son elogios (nota 4–5). Los reclamos se concentran en: pedido no recibido (28%), atención al cliente (17%) y
+> plazo de entrega (17%). Lo más valorado: plazo de entrega (42%) y calidad y estado del producto (12%).
+>
+> Reclamos frecuentes: “Não recebi o produto.” (×132) · “Ainda não recebi o produto...” (×73) · “Quero meu dinheiro de
+> volta” (×30) · “O produto nao foi entregue.” (×27) · “Produto de péssima qualidade.” (×17)
+
+Para un vendedor con nota media de 2,7, el resumen ejecutivo destaca que “fidelidad al anuncio aparece en el 33 % de sus
+reclamos (media: 12 %)”, y las frases elegidas lo confirman (“Comprei o produto não veio o modelo que eu queria”). Más
+ejemplos en `docs/evaluacion_resumen.md`, §4.
+
+**Integración en la aplicación.**
+
+| Endpoint | Uso |
+|---|---|
+| `POST /api/reviews/summarize` | Resume un texto pegado (español o portugués) y lista sus temas |
+| `GET /api/reviews/seller/{seller_id}` | Indicadores, temas, reclamos y elogios representativos de un vendedor |
+| `GET /api/reviews/category/{categoria}` | Lo mismo para una categoría de producto |
+| `GET /api/reviews/overview` | Lo mismo para toda la plataforma |
+| `GET /api/reviews/options` | Vendedores y categorías con más reseñas, para los selectores |
+
+Todos aceptan `n_oraciones` (1–15 frases por sección). Las reseñas se preparan una vez por proceso (~2 s) y después cada
+consulta de vendedor o categoría tarda menos de 0,5 s. Sin los CSV de Olist, el resumen de texto pegado sigue funcionando
+y los demás endpoints responden 404 con un mensaje claro.
+
+**Limitaciones.** Las frases se citan en portugués, el idioma original. El léxico de temas no entiende ironía ni
+negaciones complejas (por eso se valida con datos de pedidos y se publica una muestra para revisión manual). Las reseñas
+de nota 3 cuentan en los totales, pero no en reclamos ni en elogios.
+
+**Pruebas.** `ml/tests/test_reviews.py` (17 pruebas: limpieza, temas en portugués y español, TextRank, MMR, indicadores
+por grupo, API y datos reales de Olist) y pruebas E2E con Playwright de la página de reseñas en cuatro tamaños de
+pantalla, con auditoría de accesibilidad.
 ### 2.5 Datos (Olist, Fashion-MNIST)
 
 #### Fashion-MNIST
