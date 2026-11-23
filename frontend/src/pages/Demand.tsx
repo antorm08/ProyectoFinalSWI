@@ -54,7 +54,7 @@ export default function Demand() {
         <div className="space-y-2 text-sm leading-5 text-slate-500">
           <p>{query.data.modelo_entrenado
             ? `Modelo ${query.data.modelo}, entrenado sobre ${query.data.ventana?.inicio ? `el período ${date(query.data.ventana.inicio)} – ${date(query.data.ventana.fin ?? "")}` : "su histórico de referencia"}.`
-            : "Modelo SARIMA pendiente; se repiten los valores de la última semana disponible."}</p>
+            : "Modelo pendiente de entrenar; se repiten los valores de la última semana disponible."}</p>
           {metricas && <p>Medido en {metricas.periodo}, fuera de muestra: {number(metricas.mae, 1)} pedidos/día de error absoluto medio y MASE {number(metricas.mase, 2)}. El baseline de repetir la última semana comete {number(metricas.baseline_mae ?? 0, 1)}.</p>}
           {banda.length > 0 && <p>La banda no es decorativa: su cobertura se mide frente al nivel nominal. Análisis completo en <code>docs/evaluacion_demanda.md</code>.</p>}
         </div>

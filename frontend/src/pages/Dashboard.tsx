@@ -9,7 +9,7 @@ import { date, number } from "../utils/format";
 
 const modules: { key: string; to: string; title: string; technique: string; description: string; icon: IconName }[] = [
   { key: "tiempo_entrega", to: "/retrasos", title: "Tiempo de entrega", technique: "HistGradientBoosting · experimental", description: "Estima los días desde la compra hasta la entrega de un pedido.", icon: "shield" },
-  { key: "demanda", to: "/demanda", title: "Pronóstico de demanda", technique: "SARIMA", description: "Consulta el volumen diario previsto.", icon: "chart" },
+  { key: "demanda", to: "/demanda", title: "Pronóstico de demanda", technique: "Perfil semanal", description: "Consulta el volumen diario previsto.", icon: "chart" },
   { key: "productos", to: "/productos", title: "Clasificación visual", technique: "CNN · Fashion-MNIST", description: "Clasifica imágenes de prendas y accesorios.", icon: "image" },
   { key: "vendedores", to: "/vendedores", title: "Segmentación de vendedores", technique: "K-Means", description: "Compara desempeño comercial y logístico.", icon: "users" },
   { key: "resumen", to: "/resenas", title: "Resumen de reseñas", technique: "TextRank extractivo", description: "Resume opiniones de clientes.", icon: "text" },
