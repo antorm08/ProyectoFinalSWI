@@ -79,7 +79,20 @@ export interface SellerRow {
   nota_media: number; tasa_retraso: number; dias_entrega_medio: number; n_vendedores?: number;
 }
 export interface SellersOutput { modelo_entrenado: boolean; clusters: SellerRow[]; vendedores: SellerRow[] }
-export interface SummaryOutput { resumen: string; oraciones_originales: number; oraciones_resumen: number }
+export interface TemaDetectado { tema: string; etiqueta: string; menciones: number; porcentaje: number; porcentaje_plataforma?: number | null }
+export interface SummaryOutput { resumen: string; oraciones_originales: number; oraciones_resumen: number; temas?: TemaDetectado[] }
+export interface FraseRepresentativa { texto: string; repeticiones: number; temas: string[] }
+export interface ReviewInsights extends SummaryOutput {
+  ambito: "vendedor" | "categoria" | "plataforma"; identificador: string | null; etiqueta: string;
+  resenas_totales: number; resenas_con_comentario: number; nota_media: number; distribucion_notas: Record<string, number>;
+  pct_reclamos: number; pct_elogios: number; pct_reclamos_plataforma: number; resumen_ejecutivo: string;
+  reclamos: FraseRepresentativa[]; elogios: FraseRepresentativa[]; temas_reclamos: TemaDetectado[]; temas_elogios: TemaDetectado[];
+  advertencias: string[];
+}
+export interface ReviewOptions {
+  vendedores: { seller_id: string; resenas_con_comentario: number; nota_media: number }[];
+  categorias: { categoria: string; etiqueta: string; resenas_con_comentario: number }[];
+}
 
 // ---- Endpoints ----
 export const api = {
@@ -96,5 +109,8 @@ export const api = {
   },
   sellers: (signal?: AbortSignal) => request<SellersOutput>("/sellers/clusters", { signal }),
   summarize: (texto: string, n_oraciones: number, signal?: AbortSignal) => request<SummaryOutput>("/reviews/summarize", { ...json({ texto, n_oraciones }), signal }),
-  summarizeSeller: (id: string, n: number, signal?: AbortSignal) => request<SummaryOutput>(`/reviews/seller/${encodeURIComponent(id)}?n_oraciones=${n}`, { signal }),
+  summarizeSeller: (id: string, n: number, signal?: AbortSignal) => request<ReviewInsights>(`/reviews/seller/${encodeURIComponent(id)}?n_oraciones=${n}`, { signal }),
+  summarizeCategory: (categoria: string, n: number, signal?: AbortSignal) => request<ReviewInsights>(`/reviews/category/${encodeURIComponent(categoria)}?n_oraciones=${n}`, { signal }),
+  reviewsOverview: (n: number, signal?: AbortSignal) => request<ReviewInsights>(`/reviews/overview?n_oraciones=${n}`, { signal }),
+  reviewOptions: (signal?: AbortSignal) => request<ReviewOptions>("/reviews/options", { signal }),
 };

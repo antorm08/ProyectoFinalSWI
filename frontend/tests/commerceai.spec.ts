@@ -309,6 +309,31 @@ test("reseñas conserva texto, extensión y cambio de modalidad", async ({ page 
   await expect(page.getByRole("alert")).toContainText(/Sin reseñas/);
 });
 
+test("reseñas por categoría y plataforma separan reclamos y elogios con datos de Olist", async ({ page }) => {
+  await page.goto("/resenas");
+  await page.getByRole("button", { name: "Por categoría", exact: true }).click();
+  const category = page.getByLabel("Categoría", { exact: true });
+  await expect(category.locator("option")).not.toHaveCount(1);
+  await category.selectOption({ index: 1 });
+  await page.getByLabel("Oraciones del resumen", { exact: true }).fill("3");
+  const response = page.waitForResponse((res) => res.url().includes("/api/reviews/category/") && res.url().endsWith("?n_oraciones=3"));
+  await page.getByRole("button", { name: "Generar resumen" }).click();
+  expect((await response).status()).toBe(200);
+  await expect(page.locator("#insights-summary")).toContainText("Se analizaron");
+  await expect(page.locator("#insights-summary")).toContainText("media de la plataforma");
+  for (const name of ["Reclamos representativos", "Lo más valorado", "Temas de los reclamos", "Distribución de notas"]) {
+    await expect(page.getByRole("region", { name, exact: true })).toBeVisible();
+  }
+  await expect(page.getByRole("region", { name: "Reclamos representativos", exact: true }).getByRole("listitem")).toHaveCount(3);
+  const audit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(audit.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((node) => node.target) }))).toEqual([]);
+  await page.getByRole("button", { name: "Toda la plataforma", exact: true }).click();
+  await expect(page.locator("#insights-summary")).toHaveCount(0);
+  await page.getByRole("button", { name: "Generar resumen" }).click();
+  await expect(page.locator("#insights-summary")).toContainText("Los reclamos se concentran en", { timeout: 20_000 });
+  await expect(page.getByText("Plataforma", { exact: true })).toBeVisible();
+});
+
 test("errores de conexión son visibles y se puede reintentar", async ({ page }) => {
   await page.route("**/api/health", (route) => route.abort("failed"));
   await page.goto("/");

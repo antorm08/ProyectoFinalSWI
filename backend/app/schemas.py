@@ -1,6 +1,7 @@
 """Esquemas de entrada/salida de la API (Pydantic)."""
 import re
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -147,11 +148,62 @@ class SellerClusterOutput(BaseModel):
 
 
 class SummaryInput(BaseModel):
-    texto: str = Field(..., min_length=20)
+    texto: str = Field(..., min_length=20, max_length=200_000)
     n_oraciones: int = Field(3, ge=1, le=15)
+
+
+class TemaDetectado(BaseModel):
+    tema: str                                   # clave estable, p. ej. "plazo_entrega"
+    etiqueta: str                               # nombre para mostrar
+    menciones: int
+    porcentaje: float                           # 0–1 sobre las reseñas (u oraciones) analizadas
+    porcentaje_plataforma: float | None = None  # mismo indicador en toda la plataforma
 
 
 class SummaryOutput(BaseModel):
     resumen: str
     oraciones_originales: int
     oraciones_resumen: int
+    temas: list[TemaDetectado] = []
+
+
+class FraseRepresentativa(BaseModel):
+    texto: str
+    repeticiones: int                           # reseñas que contienen la misma frase
+    temas: list[str]
+
+
+class ReviewInsights(SummaryOutput):
+    ambito: Literal["vendedor", "categoria", "plataforma"]
+    identificador: str | None
+    etiqueta: str
+    resenas_totales: int
+    resenas_con_comentario: int
+    nota_media: float
+    distribucion_notas: dict[str, int]
+    pct_reclamos: float                         # nota 1–2 sobre todas las reseñas
+    pct_elogios: float                          # nota 4–5 sobre todas las reseñas
+    pct_reclamos_plataforma: float
+    resumen_ejecutivo: str
+    reclamos: list[FraseRepresentativa]
+    elogios: list[FraseRepresentativa]
+    temas_reclamos: list[TemaDetectado]
+    temas_elogios: list[TemaDetectado]
+    advertencias: list[str] = []
+
+
+class OpcionVendedor(BaseModel):
+    seller_id: str
+    resenas_con_comentario: int
+    nota_media: float
+
+
+class OpcionCategoria(BaseModel):
+    categoria: str
+    etiqueta: str
+    resenas_con_comentario: int
+
+
+class ReviewOptions(BaseModel):
+    vendedores: list[OpcionVendedor]
+    categorias: list[OpcionCategoria]

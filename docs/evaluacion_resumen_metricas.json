@@ -1,0 +1,606 @@
+{
+  "datos": {
+    "resenas": 99224,
+    "con_comentario": 40950,
+    "mediana_caracteres": 53,
+    "oraciones_por_comentario": 1.1784859584859584,
+    "pct_oraciones_repetidas": 0.12387326716260183,
+    "pct_reclamos": 0.14688986535515602,
+    "pct_neutras": 0.0824296541159397,
+    "pct_elogios": 0.7706804805289043
+  },
+  "temas": {
+    "cobertura": {
+      "reclamos": {
+        "resenas": 10889,
+        "con_algun_tema": 0.8136,
+        "por_tema": {
+          "plazo_entrega": 0.1679,
+          "no_recibido": 0.2811,
+          "incompleto": 0.1117,
+          "anuncio": 0.1236,
+          "calidad": 0.1389,
+          "atencion": 0.1745,
+          "devolucion": 0.1434,
+          "embalaje": 0.0417,
+          "precio": 0.0589,
+          "satisfaccion": 0.0752
+        }
+      },
+      "neutras": {
+        "resenas": 3556,
+        "con_algun_tema": 0.7326,
+        "por_tema": {
+          "plazo_entrega": 0.2371,
+          "no_recibido": 0.0866,
+          "incompleto": 0.0922,
+          "anuncio": 0.119,
+          "calidad": 0.1611,
+          "atencion": 0.0689,
+          "devolucion": 0.0602,
+          "embalaje": 0.0501,
+          "precio": 0.0768,
+          "satisfaccion": 0.1488
+        }
+      },
+      "elogios": {
+        "resenas": 26505,
+        "con_algun_tema": 0.7958,
+        "por_tema": {
+          "plazo_entrega": 0.4203,
+          "no_recibido": 0.0078,
+          "incompleto": 0.0112,
+          "anuncio": 0.0684,
+          "calidad": 0.1217,
+          "atencion": 0.0369,
+          "devolucion": 0.0088,
+          "embalaje": 0.0444,
+          "precio": 0.0444,
+          "satisfaccion": 0.5042
+        }
+      }
+    },
+    "validacion": [
+      {
+        "tema": "no_recibido",
+        "grupo": "reclamos",
+        "hecho": "Pedido sin entregar cuando se escribió la reseña",
+        "n_con_tema": 3061,
+        "n_sin_tema": 7828,
+        "tasa_con_tema": 0.6776,
+        "tasa_sin_tema": 0.2611,
+        "lift": 2.59
+      },
+      {
+        "tema": "plazo_entrega",
+        "grupo": "reclamos",
+        "hecho": "Entregado después de la fecha estimada",
+        "n_con_tema": 1828,
+        "n_sin_tema": 9061,
+        "tasa_con_tema": 0.4486,
+        "tasa_sin_tema": 0.2136,
+        "lift": 2.1
+      },
+      {
+        "tema": "plazo_entrega",
+        "grupo": "elogios",
+        "hecho": "Entregado antes de la fecha estimada",
+        "n_con_tema": 11141,
+        "n_sin_tema": 15364,
+        "tasa_con_tema": 0.9683,
+        "tasa_sin_tema": 0.9483,
+        "lift": 1.02
+      },
+      {
+        "tema": "incompleto",
+        "grupo": "reclamos",
+        "hecho": "Control: incompleto frente a sin entregar",
+        "n_con_tema": 1216,
+        "n_sin_tema": 9673,
+        "tasa_con_tema": 0.153,
+        "tasa_sin_tema": 0.4065,
+        "lift": 0.38
+      },
+      {
+        "tema": "calidad",
+        "grupo": "reclamos",
+        "hecho": "Control: calidad frente a retraso",
+        "n_con_tema": 1513,
+        "n_sin_tema": 9376,
+        "tasa_con_tema": 0.0436,
+        "tasa_sin_tema": 0.2868,
+        "lift": 0.15
+      }
+    ],
+    "muestras": {
+      "plazo_entrega": [
+        "APESAR DE TER CUMPRIDO PRAZO DE ENTREGA, NÃO RECEBI O PRODUTO CONFORME NF",
+        "ainda não obtive resposta do porquê do atraso",
+        "NENHUMA ESCLARECIMENTO SOBRE ATRASO DA ENTREGA.",
+        "Esta super atrasados meu pedido, mais estão acompanhando, entrando em contato comigo."
+      ],
+      "no_recibido": [
+        "EU NAO RECEBI O PRODUTO AINDA NAO",
+        "Infelizmente ainda não foi entregue!  Primeira compra na loja parceira da stark e tive essa surpresa... devemos ficar mais atento a isso!",
+        "Não recebi as botinhas",
+        "não recebi"
+      ],
+      "incompleto": [
+        "Comprei 2 puffs e um chromebook. A entrega foi incompleta. Os puffs nao foram entregues. Tento telefonar para reclamar e nenhum dos telefone",
+        "Falta entregar um dos produtos",
+        "Boa tarde, pedi 3 gorros mas só recebi, é agora que faço?",
+        "não receci todas as peças compradas, somente metade das peças compradas"
+      ],
+      "anuncio": [
+        "a cor do produto no site é diferente do produto recebido.",
+        "Comprei pensando q seria igual a foto quando chegou totalmente diferente",
+        "Preciso trocar os copos pois vieram errados. O produto que eu pedi foram 2 copos do liquidificador Philips Walesa código RI 2044 na cor PRET",
+        "A descrição do produto não condiz com o que é! Na descrição da compra está: Composição: 100% Algodão. No entanto, na embalagem do produto a "
+      ],
+      "calidad": [
+        "Dia 18 de dezembro de 2017, o produto veio com uma das partes quebrada e outra mal confeccionada (com um encaixe mal feito).  Solicito a tro",
+        "Veio estragada, os ilhoes soltos. N indico",
+        "O produto chegou em 2 entregas, só que bem mal embalado, sem aviso de frágil, num papel pardo. Entregaram 2 pacotes em um dia e um pacote no",
+        "Produto nao e original , de mau qualidade nunca mais compro com ele , as tesouras nao fecham bem vagabunda mesmo tipo deve custar uns 10 rea"
+      ],
+      "atencion": [
+        "NAO TIVE RETORNO E NAO RECEBI A MERCADORIA COM MAIS DE 20 DIAS DE PEDIDO APROVADO",
+        "comprei 2 toner hp ce278a e só recebi 1 e ainda emitiram a nota fiscal com 2 produtos. Estou até agora, esperando a entrega do segundo toner",
+        "fiz uma compra, meus pedidos vieram separados até ai tudo bem, mas ficou faltando um produto e até agora não foi entregue! e isso que paguei",
+        "Foi anunciado um produto e veio outro, totalmente inferior ao que eu comprei, enviei um e-mail para lannister e até agora não se resolveu na"
+      ],
+      "devolucion": [
+        "Irresponsável, não tem nenhuma preocupação com o cliente pois cancela a venda na véspera da entrega após esperar 45dias. Fui Obrigada a colo",
+        "Quero devolver pois recebi algo que não pedi",
+        "Recebi um email relatando que o produto teria sido extraviado e fiz o cancelamento pois era a bolsa de um bebê Comprei outra e agora recebi ",
+        "nao responem email, ate hoje nao recebi o produto e nao dao satisfacao quero meu dinheiro de volta"
+      ],
+      "embalaje": [
+        "Muito ruim!! Embalaram ele dobrado e por isso quando enche ele é difícil desamassar!! Péssimo... Estou insatisfeito com o produto... Desapon",
+        "Todos os produtos chegaram quebrados e um absurdo isso eles foram muito mau embalados e não tinha especificação na caixa falando q era produ",
+        "O relógio é simples, está ok. A embalagem veio amassada.",
+        "A caixa do produto chegou amassada. Os correios informaram q o vendedor nao optou pela embalagem apropriada e quem deveria responder por iss"
+      ],
+      "precio": [
+        "Foi enviado produto Diferente daquele do anúncio. Solicitei devolver o produto e receber o valor pago, porém ainda não tive resposta. Espero",
+        "Achei o prazo para entrega muito longo (40 dias) e a loja ainda atrasou um dia. Pela primeira vez, comprei um produto no baratheon e esperei",
+        "Aguardo a entrega do que comprei, no dia 10/02/2018. Ate agora, nada de produto. Estou aguardando todo esse tempo, somente pelo atendimento ",
+        "Veio uma porcariaaaaa nao vale o preço que é .."
+      ],
+      "satisfaccion": [
+        "Considerando o site stark nunca tive problema algum e recomendo ao meus amigos porém está empresa que está atendendo com a venda do produto ",
+        "Não gostei porque a empresa enviou um envelope vazio.",
+        "Comprei o produto e não recebi já vai fazer um mês, muito ruim não recomendo.",
+        "Não recomendo pois meu pedido veio errado não foi o produto que comprei veio um totalmente diferente"
+      ]
+    }
+  },
+  "comparacion": {
+    "resumen": [
+      {
+        "grupo": "reclamos",
+        "metodo": "Aleatorio (5 semillas)",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.5046,
+        "resenas_representadas": 0.1025,
+        "cobertura_temas": 0.5922,
+        "redundancia": 0.0527,
+        "palabras_por_frase": 11.6273,
+        "cobertura_contenido_std": 0.0718,
+        "resenas_representadas_std": 0.055,
+        "cobertura_temas_std": 0.1378,
+        "redundancia_std": 0.0254
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "Más frecuentes",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.531,
+        "resenas_representadas": 0.1188,
+        "cobertura_temas": 0.6333,
+        "redundancia": 0.074,
+        "palabras_por_frase": 10.6133,
+        "cobertura_contenido_std": 0.1094,
+        "resenas_representadas_std": 0.0537,
+        "cobertura_temas_std": 0.2353,
+        "redundancia_std": 0.0605
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "Centroide TF-IDF",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.7265,
+        "resenas_representadas": 0.1389,
+        "cobertura_temas": 0.5944,
+        "redundancia": 0.3789,
+        "palabras_por_frase": 11.88,
+        "cobertura_contenido_std": 0.0469,
+        "resenas_representadas_std": 0.0501,
+        "cobertura_temas_std": 0.2462,
+        "redundancia_std": 0.1647
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "TextRank clásico",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.724,
+        "resenas_representadas": 0.1371,
+        "cobertura_temas": 0.6,
+        "redundancia": 0.3617,
+        "palabras_por_frase": 12.6067,
+        "cobertura_contenido_std": 0.0454,
+        "resenas_representadas_std": 0.0516,
+        "cobertura_temas_std": 0.2439,
+        "redundancia_std": 0.16
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "TextRank ponderado",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.7249,
+        "resenas_representadas": 0.1372,
+        "cobertura_temas": 0.6,
+        "redundancia": 0.3673,
+        "palabras_por_frase": 12.3933,
+        "cobertura_contenido_std": 0.0452,
+        "resenas_representadas_std": 0.0515,
+        "cobertura_temas_std": 0.2439,
+        "redundancia_std": 0.1659
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "TextRank ponderado + MMR λ=0.5",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.7185,
+        "resenas_representadas": 0.1474,
+        "cobertura_temas": 0.8,
+        "redundancia": 0.156,
+        "palabras_por_frase": 17.84,
+        "cobertura_contenido_std": 0.0531,
+        "resenas_representadas_std": 0.0577,
+        "cobertura_temas_std": 0.2144,
+        "redundancia_std": 0.0633
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "TextRank ponderado + MMR λ=0.7 sin umbral de paráfrasis",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.7289,
+        "resenas_representadas": 0.1468,
+        "cobertura_temas": 0.7556,
+        "redundancia": 0.2251,
+        "palabras_por_frase": 16.1133,
+        "cobertura_contenido_std": 0.051,
+        "resenas_representadas_std": 0.0522,
+        "cobertura_temas_std": 0.2201,
+        "redundancia_std": 0.0855
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "TextRank ponderado + MMR λ=0.7 (elegido)",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.73,
+        "resenas_representadas": 0.147,
+        "cobertura_temas": 0.7667,
+        "redundancia": 0.2195,
+        "palabras_por_frase": 16.2633,
+        "cobertura_contenido_std": 0.0519,
+        "resenas_representadas_std": 0.0522,
+        "cobertura_temas_std": 0.2152,
+        "redundancia_std": 0.0774
+      },
+      {
+        "grupo": "reclamos",
+        "metodo": "TextRank ponderado + MMR λ=0.9",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.7306,
+        "resenas_representadas": 0.1431,
+        "cobertura_temas": 0.6667,
+        "redundancia": 0.2853,
+        "palabras_por_frase": 14.4167,
+        "cobertura_contenido_std": 0.0459,
+        "resenas_representadas_std": 0.0525,
+        "cobertura_temas_std": 0.253,
+        "redundancia_std": 0.1106
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "Aleatorio (5 semillas)",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.5612,
+        "resenas_representadas": 0.1374,
+        "cobertura_temas": 0.6067,
+        "redundancia": 0.0762,
+        "palabras_por_frase": 8.2913,
+        "cobertura_contenido_std": 0.0675,
+        "resenas_representadas_std": 0.0457,
+        "cobertura_temas_std": 0.123,
+        "redundancia_std": 0.0339
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "Más frecuentes",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.6162,
+        "resenas_representadas": 0.1831,
+        "cobertura_temas": 0.5528,
+        "redundancia": 0.1188,
+        "palabras_por_frase": 6.8167,
+        "cobertura_contenido_std": 0.1702,
+        "resenas_representadas_std": 0.0777,
+        "cobertura_temas_std": 0.2244,
+        "redundancia_std": 0.0867
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "Centroide TF-IDF",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.815,
+        "resenas_representadas": 0.2381,
+        "cobertura_temas": 0.6083,
+        "redundancia": 0.5269,
+        "palabras_por_frase": 8.45,
+        "cobertura_contenido_std": 0.0495,
+        "resenas_representadas_std": 0.0558,
+        "cobertura_temas_std": 0.2209,
+        "redundancia_std": 0.1418
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "TextRank clásico",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.8238,
+        "resenas_representadas": 0.2394,
+        "cobertura_temas": 0.6083,
+        "redundancia": 0.4968,
+        "palabras_por_frase": 8.8033,
+        "cobertura_contenido_std": 0.0471,
+        "resenas_representadas_std": 0.0542,
+        "cobertura_temas_std": 0.2122,
+        "redundancia_std": 0.1314
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "TextRank ponderado",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.8225,
+        "resenas_representadas": 0.2398,
+        "cobertura_temas": 0.6139,
+        "redundancia": 0.4986,
+        "palabras_por_frase": 8.59,
+        "cobertura_contenido_std": 0.0464,
+        "resenas_representadas_std": 0.0536,
+        "cobertura_temas_std": 0.2092,
+        "redundancia_std": 0.1294
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "TextRank ponderado + MMR λ=0.5",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.839,
+        "resenas_representadas": 0.2506,
+        "cobertura_temas": 0.725,
+        "redundancia": 0.279,
+        "palabras_por_frase": 11.2,
+        "cobertura_contenido_std": 0.044,
+        "resenas_representadas_std": 0.0516,
+        "cobertura_temas_std": 0.2354,
+        "redundancia_std": 0.082
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "TextRank ponderado + MMR λ=0.7 sin umbral de paráfrasis",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.849,
+        "resenas_representadas": 0.2522,
+        "cobertura_temas": 0.7,
+        "redundancia": 0.3925,
+        "palabras_por_frase": 9.8433,
+        "cobertura_contenido_std": 0.0379,
+        "resenas_representadas_std": 0.0539,
+        "cobertura_temas_std": 0.2165,
+        "redundancia_std": 0.1077
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "TextRank ponderado + MMR λ=0.7 (elegido)",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.8499,
+        "resenas_representadas": 0.252,
+        "cobertura_temas": 0.7056,
+        "redundancia": 0.3899,
+        "palabras_por_frase": 9.8633,
+        "cobertura_contenido_std": 0.0381,
+        "resenas_representadas_std": 0.0541,
+        "cobertura_temas_std": 0.2112,
+        "redundancia_std": 0.1037
+      },
+      {
+        "grupo": "elogios",
+        "metodo": "TextRank ponderado + MMR λ=0.9",
+        "n_grupos": 60,
+        "cobertura_contenido": 0.8377,
+        "resenas_representadas": 0.2467,
+        "cobertura_temas": 0.6583,
+        "redundancia": 0.444,
+        "palabras_por_frase": 9.37,
+        "cobertura_contenido_std": 0.0459,
+        "resenas_representadas_std": 0.0556,
+        "cobertura_temas_std": 0.2157,
+        "redundancia_std": 0.101
+      },
+      {
+        "grupo": "todos",
+        "metodo": "Aleatorio (5 semillas)",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.5329,
+        "resenas_representadas": 0.1199,
+        "cobertura_temas": 0.5994,
+        "redundancia": 0.0645,
+        "palabras_por_frase": 9.9593,
+        "cobertura_contenido_std": 0.075,
+        "resenas_representadas_std": 0.0533,
+        "cobertura_temas_std": 0.1303,
+        "redundancia_std": 0.0321
+      },
+      {
+        "grupo": "todos",
+        "metodo": "Más frecuentes",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.5736,
+        "resenas_representadas": 0.1509,
+        "cobertura_temas": 0.5931,
+        "redundancia": 0.0964,
+        "palabras_por_frase": 8.715,
+        "cobertura_contenido_std": 0.1488,
+        "resenas_representadas_std": 0.0739,
+        "cobertura_temas_std": 0.2325,
+        "redundancia_std": 0.0778
+      },
+      {
+        "grupo": "todos",
+        "metodo": "Centroide TF-IDF",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.7707,
+        "resenas_representadas": 0.1885,
+        "cobertura_temas": 0.6014,
+        "redundancia": 0.4529,
+        "palabras_por_frase": 10.165,
+        "cobertura_contenido_std": 0.0654,
+        "resenas_representadas_std": 0.0726,
+        "cobertura_temas_std": 0.233,
+        "redundancia_std": 0.1701
+      },
+      {
+        "grupo": "todos",
+        "metodo": "TextRank clásico",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.7739,
+        "resenas_representadas": 0.1882,
+        "cobertura_temas": 0.6042,
+        "redundancia": 0.4292,
+        "palabras_por_frase": 10.705,
+        "cobertura_contenido_std": 0.068,
+        "resenas_representadas_std": 0.0736,
+        "cobertura_temas_std": 0.2277,
+        "redundancia_std": 0.1608
+      },
+      {
+        "grupo": "todos",
+        "metodo": "TextRank ponderado",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.7737,
+        "resenas_representadas": 0.1885,
+        "cobertura_temas": 0.6069,
+        "redundancia": 0.4329,
+        "palabras_por_frase": 10.4917,
+        "cobertura_contenido_std": 0.0669,
+        "resenas_representadas_std": 0.0734,
+        "cobertura_temas_std": 0.2264,
+        "redundancia_std": 0.1622
+      },
+      {
+        "grupo": "todos",
+        "metodo": "TextRank ponderado + MMR λ=0.5",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.7788,
+        "resenas_representadas": 0.199,
+        "cobertura_temas": 0.7625,
+        "redundancia": 0.2175,
+        "palabras_por_frase": 14.52,
+        "cobertura_contenido_std": 0.0775,
+        "resenas_representadas_std": 0.0752,
+        "cobertura_temas_std": 0.2273,
+        "redundancia_std": 0.0956
+      },
+      {
+        "grupo": "todos",
+        "metodo": "TextRank ponderado + MMR λ=0.7 sin umbral de paráfrasis",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.789,
+        "resenas_representadas": 0.1995,
+        "cobertura_temas": 0.7278,
+        "redundancia": 0.3088,
+        "palabras_por_frase": 12.9783,
+        "cobertura_contenido_std": 0.075,
+        "resenas_representadas_std": 0.0748,
+        "cobertura_temas_std": 0.2192,
+        "redundancia_std": 0.1282
+      },
+      {
+        "grupo": "todos",
+        "metodo": "TextRank ponderado + MMR λ=0.7 (elegido)",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.7899,
+        "resenas_representadas": 0.1995,
+        "cobertura_temas": 0.7361,
+        "redundancia": 0.3047,
+        "palabras_por_frase": 13.0633,
+        "cobertura_contenido_std": 0.0754,
+        "resenas_representadas_std": 0.0747,
+        "cobertura_temas_std": 0.2145,
+        "redundancia_std": 0.125
+      },
+      {
+        "grupo": "todos",
+        "metodo": "TextRank ponderado + MMR λ=0.9",
+        "n_grupos": 120,
+        "cobertura_contenido": 0.7842,
+        "resenas_representadas": 0.1949,
+        "cobertura_temas": 0.6625,
+        "redundancia": 0.3646,
+        "palabras_por_frase": 11.8933,
+        "cobertura_contenido_std": 0.0706,
+        "resenas_representadas_std": 0.0749,
+        "cobertura_temas_std": 0.2342,
+        "redundancia_std": 0.1321
+      }
+    ],
+    "contexto": {
+      "vendedores": 60,
+      "grupos": 120,
+      "proporcion_grupos_no_peor": {
+        "vs_textrank_clasico": 0.8333,
+        "vs_centroide": 0.8,
+        "vs_aleatorio": 0.95
+      }
+    }
+  },
+  "decision": "Se elige **TextRank ponderado por frecuencia + MMR (λ = 0.7)** con n-gramas de caracteres. Frente a TextRank clásico cubre más contenido (0.790 frente a 0.774), representa más reseñas (20.0% frente a 18.8%), recoge más temas principales (73.6% frente a 60.4%) y repite menos (0.305 frente a 0.429; centroide: 0.453). Sin MMR, TextRank y el centroide eligen variantes de la misma frase (“não recebi o produto” escrito de cinco formas). El coste es que las frases elegidas son algo más largas (13.1 frente a 10.7 palabras). λ = 0.5 diversifica aún más (temas 76.2%, redundancia 0.217) pero elige frases más largas (14.5 palabras) y cubre menos contenido (0.779); λ = 0.9 se acerca a TextRank sin MMR. Ponderar por frecuencia casi no cambia las métricas, porque el filtro de candidatas ya usa la frecuencia, pero hace que la frase que comparten más clientes salga primero. El umbral de paráfrasis (coseno > 0.6) mejora poco frente a no usarlo (redundancia 0.309 → 0.305, temas 72.8% → 73.6%), pero evita que en vendedores con pocas reseñas salgan dos versiones de la misma frase. Ningún método supera al azar en redundancia: el azar elige frases sin relación entre sí, a costa de cubrir mucho menos (0.533).",
+  "contraste": {
+    "TextRank clásico": [
+      "nao recebi o produto ainda",
+      "EU NAO RECEBI O PRODUTO AINDA NAO",
+      "produto que não recebi ainda",
+      "Ainda não recebi meu produto",
+      "Não recebi meu produto ainda"
+    ],
+    "Centroide TF-IDF": [
+      "Não recebi o produto que eu comprei",
+      "AINDA NÃO RECEBI MEU PRODUTO, JÁ FAZ UM MÊS QUE COMPREI E AINDA NÃO RECEBI O PRODUTO",
+      "produto que não recebi ainda",
+      "Comprei e não recebi o produto.",
+      "EU NAO RECEBI O PRODUTO AINDA NAO"
+    ],
+    "TextRank ponderado + MMR (elegido)": [
+      "Não recebi o produto.",
+      "Ainda não recebi o produto...",
+      "Quero meu dinheiro de volta",
+      "O produto nao foi entregue.",
+      "Produto de péssima qualidade."
+    ]
+  },
+  "latencia": {
+    "carga_inicial_s": 2.39,
+    "plataforma_primera_vez_s": 4.11,
+    "vendedor_o_categoria_max_s": 0.48,
+    "texto_pegado_s": 0.003
+  },
+  "parametros": {
+    "n_frases": 5,
+    "mmr_lambda": 0.7,
+    "max_candidatas": 400,
+    "min_palabras": 3,
+    "umbral_representada": 0.5
+  }
+}
