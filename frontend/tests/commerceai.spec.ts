@@ -52,23 +52,58 @@ test("navegación por teclado y cierre del menú móvil", async ({ page }) => {
 });
 
 test("ETA ejecuta el modelo real sin plazo prometido y calcula llegada desde compra", async ({ page }, info) => {
+  const compactHeight = info.project.name === "desktop" ? 720 : null;
+  if (compactHeight) await page.setViewportSize({ width: 1440, height: compactHeight });
   await page.goto("/retrasos");
+  const form = page.getByRole("form", { name: "Detalles de la estimación" });
+  if (compactHeight) {
+    const bounds = await form.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(compactHeight);
+  }
   await expect(page.getByLabel(/Plazo prometido/)).toHaveCount(0);
+  await expect(page.getByText("Modelo entrenado", { exact: true })).toHaveCount(0);
+  for (const title of ["Datos del pedido", "Ruta logística", "Compra"]) {
+    await expect(page.getByRole("group", { name: title, exact: true })).toBeVisible();
+  }
+  const weightHelp = page.getByText("¿No conoces el peso?", { exact: true });
+  await weightHelp.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Introduce 0 si no conoces el peso total.")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await page.getByText("¿Hay varios vendedores?", { exact: true }).click();
+  await expect(page.getByText(/Usa el estado con mayor valor total de artículos/)).toBeVisible();
+  await page.getByText("¿Hay varios vendedores?", { exact: true }).click();
+  await page.getByLabel("Fecha de compra (opcional)").fill("2018-09-02");
+  await expect(page.getByText(/Según la fecha:.*Septiembre · Domingo/)).toBeVisible();
   await page.getByLabel("Fecha de compra (opcional)").fill("2018-08-06");
+  await expect(page.getByText(/Según la fecha:.*Agosto · Lunes/)).toBeVisible();
+  await expect(page.getByLabel("Mes de compra", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Día de la semana de compra")).toHaveCount(0);
   const response = page.waitForResponse((res) => res.url().endsWith("/api/delay/predict-duration") && res.request().method() === "POST");
   await page.getByRole("button", { name: "Estimar tiempo de entrega" }).click();
   const res = await response;
   expect(res.status()).toBe(200);
   expect(res.request().postDataJSON()).toEqual({ precio: 120, flete: 20, peso_g: 1500, n_items: 1, estado_cliente: "RJ", estado_vendedor: "SP", fecha_compra: "2018-08-06" });
   const body = await res.json();
+  const direct = await page.request.post(res.url(), { data: res.request().postDataJSON() });
+  expect(direct.status()).toBe(200);
+  expect(await direct.json()).toEqual(body);
   expect(body).toMatchObject({ experimental: true, modelo: "HistGradientBoostingRegressor", fecha_llegada_estimada: "2018-08-16", mae_desarrollo_dias: 4.60, mae_agosto_retrospectivo_dias: 3.31 });
   expect(body.dias_entrega_estimados).toBeCloseTo(10.90887913, 7);
   expect(body).not.toHaveProperty("probabilidad_retraso");
   await expect(page.getByText("10,91 días", { exact: true })).toBeVisible();
   await expect(page.locator("time")).toHaveAttribute("datetime", "2018-08-16");
-  await expect(page.getByText("Modelo experimental", { exact: true })).toBeVisible();
-  await expect(page.getByText(/no un intervalo de confianza/)).toBeVisible();
-  await expect(page.getByText("Menor fiabilidad en entregas prolongadas")).toBeVisible();
+  await expect(page.getByText("Modelo entrenado", { exact: true })).toBeVisible();
+  await expect(page.getByText(/no garantiza resultados comerciales/)).toBeVisible();
+  await expect(page.getByText("HistGradientBoostingRegressor", { exact: true })).toBeHidden();
+  await page.getByText("Rendimiento del modelo", { exact: true }).click();
+  await expect(page.getByText("HistGradientBoostingRegressor", { exact: true })).toBeVisible();
+  await expect(page.getByText("4,6 días", { exact: true })).toBeVisible();
+  await expect(page.getByText("3,31 días", { exact: true })).toBeVisible();
+  await expect(page.getByText(/no es un intervalo de confianza/)).toBeVisible();
+  await expect(page.getByText("Menor fiabilidad en entregas prolongadas.")).toBeVisible();
+  await page.getByText("Rendimiento del modelo", { exact: true }).click();
   const audit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(audit.violations).toEqual([]);
   await page.screenshot({ path: info.outputPath("prediccion-real-eta.png"), fullPage: true });
@@ -82,13 +117,19 @@ test("ETA permite predecir solo duración sin inventar fecha", async ({ page }, 
   await expect(page.getByLabel("Fecha de compra (opcional)")).toHaveValue("");
   await page.getByLabel("Mes de compra", { exact: true }).selectOption("8");
   await page.getByLabel("Día de la semana de compra").selectOption("0");
+  await page.getByLabel("Fecha de compra (opcional)").fill("2018-09-02");
+  await page.getByLabel("Fecha de compra (opcional)").fill("");
+  await expect(page.getByLabel("Mes de compra", { exact: true })).toHaveValue("8");
+  await expect(page.getByLabel("Día de la semana de compra")).toHaveValue("0");
   const response = page.waitForResponse((res) => res.url().endsWith("/api/delay/predict-duration") && res.request().method() === "POST");
   await page.getByRole("button", { name: "Estimar tiempo de entrega" }).click();
   const res = await response;
   expect(res.status()).toBe(200);
   expect(res.request().postDataJSON()).toMatchObject({ mes: 8, dia_semana: 0 });
   expect(res.request().postDataJSON()).not.toHaveProperty("fecha_compra");
-  expect((await res.json()).fecha_llegada_estimada).toBeNull();
+  const body = await res.json();
+  expect(body.fecha_llegada_estimada).toBeNull();
+  expect(body.dias_entrega_estimados).toBeCloseTo(10.90887913, 7);
   await expect(page.getByText("10,91 días", { exact: true })).toBeVisible();
   await expect(page.getByText("No disponible sin fecha de compra")).toBeVisible();
   await expect(page.locator("time")).toHaveCount(0);
@@ -104,6 +145,7 @@ test("ETA comunica 503 sin mostrar una estimación falsa", async ({ page }) => {
   await page.getByRole("button", { name: "Estimar tiempo de entrega" }).click();
   await expect(page.getByRole("alert")).toContainText("Modelo de tiempo de entrega no disponible");
   await expect(page.getByText("Tiempo estimado desde la compra", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Modelo entrenado", { exact: true })).toHaveCount(0);
 });
 
 test("clasificación histórica conserva su endpoint y contrato", async ({ request }) => {
