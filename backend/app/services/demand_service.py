@@ -21,6 +21,7 @@ from app.core.config import DEMAND_MODEL
 from app.db import olist
 from app.schemas import DemandMetrics, DemandOutput, ForecastPoint
 from app.services.demand_calendar import calendar_exog
+from app.services.demand_coverage import coverage_bounds
 from app.services.demand_model import BundleIncompatible, desempaquetar, pronosticar
 
 log = logging.getLogger(__name__)
@@ -78,8 +79,9 @@ def _historico_vivo() -> pd.Series | None:
     marcas = marcas.dropna()
     if marcas.empty:
         return None
-    serie = marcas.dt.floor("D").value_counts().sort_index().asfreq("D", fill_value=0)
-    return serie.astype(float)
+    serie = marcas.dt.floor("D").value_counts().sort_index().asfreq("D", fill_value=0).astype(float)
+    start, end, _, _ = coverage_bounds(serie)
+    return serie.iloc[start:end + 1]
 
 
 def _sintetico() -> pd.Series:
@@ -135,22 +137,7 @@ def forecast(horizonte: int, ventana_historico: int = 90, nivel: float = 0.8) ->
         historico = _historico_vivo()
         if historico is None:
             historico = _sintetico()
-        else:
-            bundle_fin = historico.index[-1]
-            historico = historico.loc[:bundle_fin]
-        ultima_semana = historico.iloc[-7:].to_numpy()
-        futuro = pd.date_range(historico.index[-1] + pd.Timedelta(days=1),
-                               periods=horizonte, freq="D")
-        serie = _puntos(historico, ventana_historico) + [
-            ForecastPoint(fecha=f"{fecha:%Y-%m-%d}",
-                          valor=round(float(max(ultima_semana[i % 7], 0)), 2),
-                          tipo="pronostico")
-            for i, fecha in enumerate(futuro)
-        ]
-        return DemandOutput(
-            serie=serie, modelo_entrenado=False, modelo="provisional",
-            ancla=f"{historico.index[-1]:%Y-%m-%d}",
-        )
+        return forecast_provisional(horizonte, ventana_historico, historico)
 
     historico, spec, resultados, meta = cargado
     historico, resultados = _al_dia(historico, resultados, spec, historico.index[-1])
@@ -183,6 +170,9 @@ def forecast(horizonte: int, ventana_historico: int = 90, nivel: float = 0.8) ->
 
 def forecast_provisional(horizonte: int, ventana_historico: int, historico: pd.Series) -> DemandOutput:
     """Repetición de la última semana sobre un histórico ya cargado."""
+    if len(historico) < 7:
+        return DemandOutput(serie=_puntos(historico, ventana_historico), modelo_entrenado=False,
+                            ancla=f"{historico.index[-1]:%Y-%m-%d}" if not historico.empty else None)
     ultima_semana = historico.iloc[-7:].to_numpy()
     futuro = pd.date_range(historico.index[-1] + pd.Timedelta(days=1), periods=horizonte, freq="D")
     serie = _puntos(historico, ventana_historico) + [

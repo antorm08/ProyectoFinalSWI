@@ -3,7 +3,9 @@
 Salidas: backend/app/models/seller_kmeans.joblib y seller_clusters.csv
 """
 import argparse
+import hashlib
 import json
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -108,51 +110,89 @@ def label_clusters(centers: pd.DataFrame) -> dict[int, str]:
     remaining = set(centers.index)
     labels: dict[int, str] = {}
 
-    c_delay = int(centers.loc[list(remaining), "tasa_retraso"].idxmax())
+    c_delay = int(centers.loc[sorted(remaining), "tasa_retraso"].idxmax())
     labels[c_delay] = "Logística problemática"
     remaining.remove(c_delay)
 
     if remaining:
-        c_top = int(centers.loc[list(remaining), "facturacion"].idxmax())
+        c_top = int(centers.loc[sorted(remaining), "facturacion"].idxmax())
         labels[c_top] = "Vendedores estrella (alto volumen)"
         remaining.remove(c_top)
 
-    if remaining:
-        c_low = int(centers.loc[list(remaining), "nota_media"].idxmin())
+    if len(remaining) > 1:
+        c_low = int(centers.loc[sorted(remaining), "nota_media"].idxmin())
         labels[c_low] = "Baja satisfacción"
         remaining.remove(c_low)
 
+    estables = [
+        c for c in sorted(remaining)
+        if centers.loc[c, "tasa_retraso"] <= centers["tasa_retraso"].median()
+        and centers.loc[c, "nota_media"] >= centers["nota_media"].median()
+    ]
+    if estables:
+        c_stable = int(centers.loc[estables, "tasa_retraso"].idxmin())
+        labels[c_stable] = "Vendedores estables"
+        remaining.remove(c_stable)
     for c in sorted(remaining):
-        labels[int(c)] = "Vendedores estables"
+        labels[int(c)] = f"Perfil intermedio (grupo {c + 1})"
 
     return labels
 
 
-def main(check_only=False):
+def main(check_only=False, *, models_dir=MODELS, metrics_path=None):
     df = seller_metrics()
     print(json.dumps(df.attrs["audit"], ensure_ascii=False, indent=2))
     if check_only:
         return df.attrs["audit"]
+    models_dir = Path(models_dir)
+    model_path, table_path = models_dir / "seller_kmeans.joblib", models_dir / "seller_clusters.csv"
+    for target in (model_path, table_path, metrics_path):
+        if target is not None and Path(target).exists():
+            raise FileExistsError(f"Respalda los resultados anteriores o elige otra ruta: {target}")
     print(f"Vendedores con >= {MIN_PEDIDOS} pedidos: {len(df):,}")
     X = df[FEATURES]
-    for k in range(2, 8):
+    candidates = {}
+    for k in range(2, min(8, len(X) - 1) + 1):
         p = build_pipeline(k).fit(X)
-        print(f"k={k}: silhouette={silhouette_score(p['prep'].transform(X), p['km'].labels_):.3f}")
+        score = float(silhouette_score(p["prep"].transform(X), p["km"].labels_))
+        candidates[k] = (score, p)
+        print(f"k={k}: silhouette={score:.4f}")
 
-    k = 4
-    pipe = build_pipeline(k).fit(X)
+    k = max(candidates, key=lambda n: (candidates[n][0], -n))
+    score, pipe = candidates[k]
     df["cluster"] = pipe["km"].labels_
     etiquetas = label_clusters(df.groupby("cluster")[FEATURES].mean())
     df["etiqueta"] = df["cluster"].map(etiquetas)
-    print(df.groupby("etiqueta")[FEATURES].mean().round(2))
+    profiles = df.groupby(["cluster", "etiqueta"])[FEATURES].agg("mean")
+    profiles["n_vendedores"] = df.groupby(["cluster", "etiqueta"]).size()
+    print(profiles.round(4))
 
-    MODELS.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"pipeline": pipe, "etiquetas": etiquetas}, MODELS / "seller_kmeans.joblib")
-    df.reset_index().to_csv(MODELS / "seller_clusters.csv", index=False)
-    print("Guardado en", MODELS)
+    models_dir.mkdir(parents=True, exist_ok=True)
+    with model_path.open("xb") as file:
+        joblib.dump({"pipeline": pipe, "etiquetas": etiquetas}, file)
+    df.reset_index().to_csv(table_path, index=False, mode="x")
+    np.testing.assert_array_equal(joblib.load(model_path)["pipeline"].predict(X), df["cluster"])
+    report = {
+        "audit": df.attrs["audit"], "features": FEATURES, "k_seleccionado": k,
+        "criterio": "Máximo Silhouette sobre las mismas variables escaladas; empate por k menor.",
+        "silhouette": score, "barrido_k": {n: value for n, (value, _) in candidates.items()},
+        "perfiles_clusters": profiles.reset_index().to_dict(orient="records"),
+        "artefactos_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (model_path, table_path)},
+    }
+    if metrics_path is not None:
+        metrics_path = Path(metrics_path)
+        metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        with metrics_path.open("x", encoding="utf-8") as file:
+            json.dump(report, file, ensure_ascii=False, indent=2, allow_nan=False)
+            file.write("\n")
+    print("Guardado en", models_dir)
+    return report
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check-data", action="store_true", help="Solo preparación; no ajustar K-Means")
-    main(check_only=parser.parse_args().check_data)
+    parser.add_argument("--models-dir", type=Path, default=MODELS)
+    parser.add_argument("--metrics", type=Path)
+    args = parser.parse_args()
+    main(check_only=args.check_data, models_dir=args.models_dir, metrics_path=args.metrics)

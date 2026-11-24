@@ -3,7 +3,12 @@
 > Plantilla. Una sección por pantalla, con capturas y ejemplo de uso.
 
 ## 1. Panel general
-## 2. Riesgo de retraso
+## 2. Tiempo estimado de entrega
+
+En **Tiempo de entrega** (`/retrasos`), completa precio, flete, peso, cantidad, origen y destino.
+Con fecha de compra se muestra la duración y una fecha estimada; sin fecha, elige mes y día de la
+semana y se muestra solo la duración. No es una promesa de entrega ni una probabilidad de retraso.
+
 ## 3. Demanda de pedidos
 
 **Para qué sirve:** anticipar cuántos pedidos entrarán cada día de las próximas semanas, para dimensionar el almacén,
@@ -21,8 +26,7 @@ el personal de preparación y la contratación de transporte.
 
 ### Cómo leer el resultado
 
-- **Pedidos previstos:** la suma del horizonte completo. Debajo aparece el rango de la banda, que es lo que conviene
-  usar para planificar: *entre X e Y pedidos*.
+- **Pedidos previstos:** la suma de las estimaciones puntuales del horizonte completo. No tiene una banda agregada.
 - **Promedio diario previsto:** la misma cifra repartida por día.
 - **Error típico del modelo:** cuánto se equivoca el modelo, en pedidos por día, medido sobre días que **no** usó para
   entrenar. También dice si mejora o no a la regla simple de repetir la última semana.
@@ -34,15 +38,14 @@ el personal de preparación y la contratación de transporte.
 
 ### Qué significa la banda
 
-La banda del 80 % quiere decir que, en los días de prueba, el valor real cayó dentro de ella aproximadamente 8 de cada
-10 veces. **No** es el mejor y el peor caso imaginables: es el rango donde cabe esperar que esté la demanda. Si
-planificas con la línea central te quedarás corto la mitad de los días; si planificas con el extremo superior,
-sobrarán recursos casi siempre.
+El 80 % es el nivel nominal de la banda diaria. En la evaluación de la versión activa, 23 de 28 días quedaron dentro
+de ella. Esa cobertura observada no se atribuye al nivel del 95 %, no se garantiza en otras fechas y no se puede
+trasladar a la suma del horizonte.
 
 ### El pronóstico no empieza hoy
 
-Olist es un **archivo histórico cerrado**: los pedidos llegan hasta agosto de 2018. Por eso el pronóstico arranca el
-día siguiente al último con datos, y la pantalla lo dice explícitamente. No es un fallo ni un reloj mal puesto.
+Olist es un **archivo histórico cerrado**: la última fecha con cobertura utilizable es el 18 de agosto de 2018.
+Por eso el pronóstico arranca el 19 de agosto de 2018; las compras aisladas posteriores no representan demanda reciente.
 
 ### Avisos
 
@@ -88,8 +91,8 @@ producto en el catálogo o para revisar productos mal categorizados.
   modelo duda entre ambas.
 
 El clasificador reconoce **10 categorías**: camiseta/top, pantalón, jersey, vestido, abrigo, sandalia, camisa, zapatilla,
-bolso y botín. Acierta el 92,5 % de las imágenes de prueba; la categoría más difícil es **camisa**, que puede confundirse
-con camiseta, jersey o abrigo.
+bolso y botín. Consulta las [métricas ligadas al artefacto activo](clasificacion_productos_metricas.json).
+Los resultados del test de Fashion-MNIST no acreditan la misma precisión en fotos de catálogo.
 
 ### Avisos y errores
 
@@ -117,6 +120,12 @@ En el móvil, el resultado aparece debajo de la imagen.
 
 ![Vista en el móvil](evidencia_clasificacion_productos/resultado-movil.png)
 ## 5. Segmentación de vendedores
+
+En **Segmentación de vendedores** (`/vendedores`) compara tres perfiles obtenidos con K-Means de
+1.766 vendedores de Olist con al menos cinco pedidos elegibles. Las tarjetas cuentan a todo el grupo;
+el gráfico y la tabla se limitan a los 300 con mayor facturación. Una etiqueta describe el promedio
+del grupo, no una evaluación individual ni una causa del desempeño.
+
 ## 6. Resumen de reseñas
 
 **Para qué sirve:** saber qué reclaman y qué valoran los clientes sin leer miles de reseñas, por vendedor, por categoría

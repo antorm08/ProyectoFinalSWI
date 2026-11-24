@@ -1,8 +1,16 @@
+import hashlib
+import json
+import sys
+
 import joblib
 import pandas as pd
 import pytest
 
+from ml.common import MODELS, ROOT
 from ml.train_sellers import FEATURES, build_pipeline, label_clusters, seller_metrics
+
+sys.path.insert(0, str(ROOT / "backend"))
+from app.services import seller_service
 
 
 def _synthetic_olist():
@@ -50,3 +58,29 @@ def test_pipeline_fit_predict_and_labels(tmp_path):
     loaded = joblib.load(model_path)
     pred = loaded["pipeline"].predict(df[FEATURES].iloc[:1])
     assert int(pred[0]) in labels
+
+
+def test_summary_does_not_claim_completed_pair_if_model_is_missing(tmp_path, monkeypatch):
+    table = tmp_path / "seller_clusters.csv"
+    table.write_text("cluster,etiqueta\n", encoding="utf-8")
+    monkeypatch.setattr(seller_service, "SELLER_TABLE", table)
+    monkeypatch.setattr(seller_service, "SELLER_MODEL", tmp_path / "absent.joblib")
+    assert seller_service.summary() == {"modelo_entrenado": False, "clusters": [], "vendedores": []}
+
+
+@pytest.mark.skipif(not all((MODELS / name).is_file() for name in ("seller_clusters.csv", "seller_kmeans.joblib")),
+                    reason="Requiere el par real de artefactos de vendedores")
+def test_active_seller_artifacts_match_report_and_reproduce_every_assignment():
+    report = json.loads((ROOT / "docs" / "activacion_vendedores_metricas.json").read_text(encoding="utf-8"))
+    for name, expected in report["artefactos_sha256"].items():
+        assert hashlib.sha256((MODELS / name).read_bytes()).hexdigest() == expected
+    df = pd.read_csv(MODELS / "seller_clusters.csv")
+    bundle = joblib.load(MODELS / "seller_kmeans.joblib")
+    assert len(df) == df.seller_id.nunique() == 1766
+    assert df.cluster.nunique() == report["k_seleccionado"] == 3
+    assert (bundle["pipeline"].predict(df[FEATURES]) == df.cluster).all()
+    assert df.cluster.map(bundle["etiquetas"]).equals(df.etiqueta)
+    assert label_clusters(df.groupby("cluster")[FEATURES].mean()) == bundle["etiquetas"]
+    result = seller_service.summary()
+    assert result["modelo_entrenado"] and sum(g["n_vendedores"] for g in result["clusters"]) == 1766
+    assert len(result["vendedores"]) == 300

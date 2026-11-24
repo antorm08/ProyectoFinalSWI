@@ -1,0 +1,73 @@
+{
+  "audit": {
+    "source_orders": 99441,
+    "delivered_status": 96478,
+    "missing_target_dates": 8,
+    "eligible_orders": 96470,
+    "late_calendar_day": 6534,
+    "source_item_rows": 112650,
+    "eligible_item_rows": 110189,
+    "seller_order_rows": 97811,
+    "rows_after_reviews_join": 97811,
+    "seller_orders_without_review": 660,
+    "sellers_with_eligible_orders": 2970,
+    "sellers_below_minimum": 1204,
+    "sellers_missing_metrics_after_minimum": 0,
+    "eligible_sellers": 1766
+  },
+  "features": [
+    "n_pedidos",
+    "facturacion",
+    "nota_media",
+    "tasa_retraso",
+    "dias_entrega_medio"
+  ],
+  "k_seleccionado": 3,
+  "criterio": "Máximo Silhouette sobre las mismas variables escaladas; empate por k menor.",
+  "silhouette": 0.3052537770562413,
+  "barrido_k": {
+    "2": 0.2663589045348379,
+    "3": 0.3052537770562413,
+    "4": 0.25148519996138996,
+    "5": 0.22100076474329686,
+    "6": 0.22677183410928425,
+    "7": 0.2218088639267393,
+    "8": 0.21787633082513663
+  },
+  "perfiles_clusters": [
+    {
+      "cluster": 0,
+      "etiqueta": "Vendedores estrella (alto volumen)",
+      "n_pedidos": 127.27272727272727,
+      "facturacion": 16717.403923444977,
+      "nota_media": 4.166867718058576,
+      "tasa_retraso": 0.06053371313249633,
+      "dias_entrega_medio": 12.289796364037544,
+      "n_vendedores": 627
+    },
+    {
+      "cluster": 1,
+      "etiqueta": "Vendedores estables",
+      "n_pedidos": 12.756272401433693,
+      "facturacion": 1562.1839784946237,
+      "nota_media": 4.380316514726926,
+      "tasa_retraso": 0.02534734447923661,
+      "dias_entrega_medio": 9.930099775319425,
+      "n_vendedores": 837
+    },
+    {
+      "cluster": 2,
+      "etiqueta": "Logística problemática",
+      "n_pedidos": 16.380794701986755,
+      "facturacion": 2996.61440397351,
+      "nota_media": 3.6704220793470563,
+      "tasa_retraso": 0.18237156795515172,
+      "dias_entrega_medio": 17.371214070553158,
+      "n_vendedores": 302
+    }
+  ],
+  "artefactos_sha256": {
+    "seller_kmeans.joblib": "b83a20f0f6c8ca9931595c9350f057c8a97be726e5f4e011fd808a9d5709e3f9",
+    "seller_clusters.csv": "3396f7736b2ad60c1d57fe3a59e8952c1f48e152cfe0207ca08d25e7abc6036d"
+  }
+}

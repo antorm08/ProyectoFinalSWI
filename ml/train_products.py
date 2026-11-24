@@ -29,6 +29,7 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
+from torchvision.datasets.utils import download_and_extract_archive
 
 try:
     from .common import MODELS, ROOT
@@ -43,6 +44,7 @@ TARGET_ACCURACY = 0.91              # criterio de aceptación sobre test
 DATA_DIR = ROOT / "data" / "fashion_mnist"
 DEFAULT_OUTPUT = MODELS / "product_cnn.pt"
 DEFAULT_METRICS = ROOT / "docs" / "clasificacion_productos_metricas.json"
+FASHION_MNIST_MIRROR = "https://raw.githubusercontent.com/zalandoresearch/fashion-mnist/master/data/fashion/"
 
 
 class ProductCNN(nn.Module):
@@ -84,9 +86,16 @@ def build_loaders(args, generator):
     ])
     eval_tf = transforms.Compose([transforms.ToTensor(), norm])
 
-    train_aug = datasets.FashionMNIST(DATA_DIR, train=True, download=True, transform=train_tf)
-    train_plain = datasets.FashionMNIST(DATA_DIR, train=True, download=True, transform=eval_tf)
-    test = datasets.FashionMNIST(DATA_DIR, train=False, download=True, transform=eval_tf)
+    try:
+        train_aug = datasets.FashionMNIST(DATA_DIR, train=True, download=True, transform=train_tf)
+    except RuntimeError:
+        # El mirror HTTP de torchvision no siempre es accesible. Mantener sus checksums.
+        raw = DATA_DIR / "FashionMNIST" / "raw"
+        for filename, md5 in datasets.FashionMNIST.resources:
+            download_and_extract_archive(FASHION_MNIST_MIRROR + filename, str(raw), filename=filename, md5=md5)
+        train_aug = datasets.FashionMNIST(DATA_DIR, train=True, download=False, transform=train_tf)
+    train_plain = datasets.FashionMNIST(DATA_DIR, train=True, download=False, transform=eval_tf)
+    test = datasets.FashionMNIST(DATA_DIR, train=False, download=False, transform=eval_tf)
 
     train_idx, val_idx = split_indices(train_aug.targets.numpy(), args.seed, args.val_size, args.subset)
     if args.subset:
@@ -171,7 +180,8 @@ def export(model, output: Path, loader) -> str:
     """Guarda TorchScript y verifica que el artefacto recargado predice igual que el modelo."""
     output.parent.mkdir(parents=True, exist_ok=True)
     model.eval()
-    torch.jit.script(model).save(str(output))
+    with output.open("xb") as file:
+        torch.jit.save(torch.jit.script(model), file)
     reloaded = torch.jit.load(str(output), map_location="cpu").eval()
     x, _ = next(iter(loader))
     with torch.no_grad():
@@ -188,6 +198,11 @@ def rel(path: Path) -> str:
 
 
 def main(args):
+    if args.output.resolve() == args.metrics.resolve():
+        raise ValueError("El modelo y su informe requieren rutas distintas")
+    for path in (args.output, args.metrics):
+        if path.exists():
+            raise FileExistsError(f"Respalda los resultados anteriores o elige una ruta nueva: {path}")
     started = datetime.now(timezone.utc).isoformat()
     set_seed(args.seed)
     if args.threads:
@@ -229,7 +244,9 @@ def main(args):
         "artifact": {"path": rel(args.output), "format": "TorchScript", "sha256": sha},
     }
     args.metrics.parent.mkdir(parents=True, exist_ok=True)
-    args.metrics.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    with args.metrics.open("x", encoding="utf-8") as file:
+        json.dump(summary, file, ensure_ascii=False, indent=2)
+        file.write("\n")
 
     print(f"\nMejor época: {best['epoch']}  accuracy val={best['accuracy']:.4f}")
     print(f"TEST: accuracy={test['accuracy']:.4f}  macro-F1={test['macro_f1']:.4f}  "

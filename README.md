@@ -4,10 +4,10 @@ Plataforma web para analizar pedidos, entregas y satisfacción de clientes con 5
 
 | # | Componente (enunciado) | Problema real | Técnica | Datos |
 |---|---|---|---|---|
-| 1 | Predicción | Riesgo de retraso de un pedido | Gradient Boosting (scikit-learn) | Olist |
+| 1 | Predicción | Tiempo estimado de entrega de un pedido | Regresión HGB (scikit-learn) | Olist |
 | 2 | Series temporales | Demanda diaria de pedidos | SARIMAX con calendario + banda calibrada (statsmodels) | Olist |
 | 3 | Clasificación de imágenes | Categorizar productos por foto | CNN (PyTorch) | Fashion-MNIST |
-| 4 | Clustering | Segmentar vendedores por desempeño | K-Means (scikit-learn) | Olist |
+| 4 | Clustering | Segmentar vendedores por desempeño | K-Means, 3 grupos (scikit-learn) | Olist |
 | 5 | Resumen de texto | Resumir opiniones y reclamos | TextRank ponderado + MMR (extractivo) y temas por léxico | Olist (reseñas) |
 
 ## Arquitectura
@@ -63,29 +63,21 @@ pip install -r requirements.txt
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 uvicorn app.main:app --reload     # http://localhost:8000/docs
 
-# 2) Entrenar modelos (con el venv activo, tras descargar los datos: ver data/README.md)
-cd ../ml
-python train_delay.py
-python -m ml.evaluate_demand   # desde la raíz: compara candidatos y calibra la banda
-python -m ml.train_demand      # desde la raíz: entrena el artefacto de demanda
-python train_products.py
-python train_sellers.py
-# El resumen de reseñas no requiere entrenamiento. Su evaluación (opcional):
-python evaluate_reviews.py        # → docs/evaluacion_resumen.md
-
-# 3) Frontend (otra terminal)
+# 2) Frontend (desde la raíz, en otra terminal)
 cd frontend
 npm install
 npm run dev                       # http://localhost:5173
 ```
 
-Sin modelos entrenados la app **funciona en modo provisional** (heurísticas/datos de ejemplo) y lo indica en pantalla,
-así el equipo puede avanzar frontend y backend en paralelo.
+Para la demo, prepara los artefactos locales siguiendo la [auditoría y guía de activación](docs/auditoria_final_modulos.md).
+Los modelos y los CSV no se incluyen en Git. ETA no emite una estimación si falta su binario aprobado;
+demanda distingue el pronóstico SARIMAX del provisional, e imágenes y vendedores no muestran resultados
+entrenados si faltan sus artefactos. TextRank no necesita entrenamiento.
 
 Con Docker: `docker compose up --build` → frontend en http://localhost:8080, API en http://localhost:8000/docs.
 
 ## Reparto sugerido (4–5 integrantes)
-- Integrante 1: predicción de retraso (`ml/train_delay.py`, `services/delay_service.py`)
+- Integrante 1: tiempo de entrega (`ml/compare_delivery_regression.py`, `services/delivery_duration_service.py`)
 - Integrante 2: series temporales (`ml/train_demand.py`, `services/demand_service.py`)
 - Integrante 3: CNN de imágenes (`ml/train_products.py`, `services/product_service.py`)
 - Integrante 4: clustering + resumen de texto

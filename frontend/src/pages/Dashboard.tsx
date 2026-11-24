@@ -31,7 +31,7 @@ export default function Dashboard() {
       <ErrorBox onRetry={forecast.retry}>{forecast.error}</ErrorBox>
       {forecast.loading && <LoadingState label="Consultando demanda…" />}
       {forecast.data && <>
-        <DemandSource trained={forecast.data.modelo_entrenado} metricas={forecast.data.metricas} nivel={forecast.data.nivel_confianza} />
+        <DemandSource trained={forecast.data.modelo_entrenado} metricas={forecast.data.metricas} modelo={forecast.data.modelo} />
         <div className="my-3 grid gap-3 md:grid-cols-3">
           <MetricCard label="Pedidos previstos" value={future.length ? number(total) : "—"} detail={`${future.length} días de pronóstico.`} />
           <MetricCard label="Promedio diario" value={future.length ? number(total / future.length, 1) : "—"} detail="Pedidos por día." />

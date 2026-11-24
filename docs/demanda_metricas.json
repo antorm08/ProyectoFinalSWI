@@ -1,5 +1,5 @@
 {
-  "started_at_utc": "2026-11-23T19:53:40+00:00",
+  "started_at_utc": "2026-11-24T16:31:44+00:00",
   "protocol": {
     "target": "pedidos creados por día, cualquier estado",
     "ventana": "regla de cobertura, no literales de fecha",
@@ -8,7 +8,7 @@
     "nota": "el artefacto se reajusta con toda la ventana; las métricas publicadas son las del holdout, calculadas antes de ese reajuste"
   },
   "versions": {
-    "python": "3.12.13",
+    "python": "3.12.10",
     "pandas": "3.1.1",
     "numpy": "2.5.5",
     "statsmodels": "0.15.0",
@@ -20,10 +20,11 @@
     "olist_orders_dataset.csv": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf"
   },
   "code_sha256": {
-    "ml/train_demand.py": "0bcd553b15a1c51727ddb1f3b2614a4af5e5172987a8e711f5109044260f84ed",
-    "ml/demand_series.py": "820ca2c16e6b3d5c2164ad439b832b616f26973d0079842c480e76a5f10cca7e",
-    "backend/app/services/demand_model.py": "dccb26b3667b0ccffbafe22865c6bb94dc9804e376e1a6c79d7cf3f92e6dfbe8",
-    "backend/app/services/demand_calendar.py": "4d62e7ddae97a691ac9c8db916dcb175f88f021de29d089d269130eb85e26bb8"
+    "ml/train_demand.py": "62a1197f4964ae3b6afc3ec1aabe5fb0413e0752d057f75251d8a7b6ad1b8963",
+    "ml/demand_series.py": "e2cec9c1a457d9337c889396520f9ba332e7ca373b310d055dcc6b54989ce265",
+    "backend/app/services/demand_model.py": "31f40c79e75777e1a6609e2ddf90612ead12146f3e3b18308589ddddbcf0b3ad",
+    "backend/app/services/demand_calendar.py": "cff48d45830e977ea4fc439892b8dd2ded550234bd331259d09a0fa61a737c10",
+    "backend/app/services/demand_coverage.py": "1402454d63b541f5d3a9b490272a5c0b4e1b147790acf353b8e3fd3a4a15fc1b"
   },
   "window": {
     "serie_completa": {
@@ -163,7 +164,6 @@
         "mae": 42.67701783021876,
         "mase": 1.2939128018802792,
         "rel_mae": 0.8660848145617381,
-        "cobertura_80": 0.75,
         "baseline_mae": 48.66517857142857,
         "periodo": "8 ventanas de 28 días, 2018-03-18 a 2018-07-21"
       }
@@ -286,31 +286,47 @@
     ]
   },
   "holdout": {
-    "mae": 60.989476836983854,
-    "rmse": 71.78914812565526,
-    "smape_pct": 24.468205088116672,
-    "bias": -59.84401946945062,
+    "mae": 46.29015521422661,
+    "rmse": 57.53511943867547,
+    "smape_pct": 17.760859012427147,
+    "bias": -43.2700794628926,
     "dias": 28,
-    "mase": 1.740052807951715,
-    "rel_mae": 1.2285650010327682,
-    "cobertura_80": 0.75,
+    "mase": 1.3206756105865145,
+    "rel_mae": 0.9324635582721906,
+    "cobertura_80": 0.8214285714285714,
     "baseline_mae": 49.642857142857146,
     "periodo": "2018-07-22 a 2018-08-18",
     "convergio": true
   },
   "published_metrics": {
+    "mae": 46.29015521422661,
+    "rmse": 57.53511943867547,
+    "smape_pct": 17.760859012427147,
+    "bias": -43.2700794628926,
+    "dias": 28,
+    "mase": 1.3206756105865145,
+    "rel_mae": 0.9324635582721906,
+    "cobertura_80": 0.8214285714285714,
+    "baseline_mae": 49.642857142857146,
+    "periodo": "2018-07-22 a 2018-08-18"
+  },
+  "baseline_holdout": {
+    "metodo": "Repetir los últimos siete días del tramo de ajuste; 28 fechas del mismo holdout.",
+    "mae": 49.642857142857146,
+    "rmse": 63.33978663864105
+  },
+  "historical_development_metrics": {
     "mae": 42.67701783021876,
     "mase": 1.2939128018802792,
     "rel_mae": 0.8660848145617381,
-    "cobertura_80": 0.75,
     "baseline_mae": 48.66517857142857,
     "periodo": "8 ventanas de 28 días, 2018-03-18 a 2018-07-21"
   },
   "artifact": {
     "path": "backend/app/models/demand_model.joblib",
     "schema": 2,
-    "bytes": 28630,
-    "sha256": "433195681cfa1be618be7b036f183bb5313d5c87063ca18da3977215a7c8825f",
+    "bytes": 28770,
+    "sha256": "0ad0fc61599d671922ff1d8e04cbd2109e95583895203d21889af354d3da7ccd",
     "roundtrip": {
       "tolerancia": 1e-06,
       "desvio_maximo": {
@@ -324,10 +340,10 @@
   "acceptance": {
     "nota": "este script mide una sola ventana de 28 días, que no basta para juzgar la precisión: el veredicto vive en docs/resultados_demanda/metricas.json, que promedia varios orígenes. Aquí se publica para poder comparar",
     "objetivo_rel_mae": 1.0,
-    "rel_mae_holdout": 1.2285650010327682,
-    "cobertura_80_holdout": 0.75,
-    "bate_al_baseline_en_esta_ventana": false
+    "rel_mae_holdout": 0.9324635582721906,
+    "cobertura_80_holdout": 0.8214285714285714,
+    "bate_al_baseline_en_esta_ventana": true
   },
-  "completed_at_utc": "2026-11-23T19:53:44+00:00",
-  "elapsed_seconds": 4.7
+  "completed_at_utc": "2026-11-24T16:32:03+00:00",
+  "elapsed_seconds": 19.1
 }

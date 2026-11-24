@@ -67,7 +67,7 @@ def multipart(field: str, filename: str, data: bytes, content_type: str):
     return body, f"multipart/form-data; boundary={boundary}"
 
 
-async def post_file(data: bytes, content_type="image/png", field="imagen", filename="foto.png"):
+async def post_file(data: bytes, content_type="image/png", field="imagen", filename="foto.png", *, with_headers=False):
     """Invoca la app FastAPI real vía ASGI (router, validación y middleware), sin servidor."""
     body, ctype = multipart(field, filename, data, content_type)
     events = []
@@ -85,8 +85,9 @@ async def post_file(data: bytes, content_type="image/png", field="imagen", filen
         "query_string": b"", "headers": [(b"content-type", ctype.encode()), (b"content-length", str(len(body)).encode())],
         "client": ("127.0.0.1", 1234), "server": ("test", 80),
     }, receive, send)
-    status = next(e["status"] for e in events if e["type"] == "http.response.start")
-    return status, json.loads(b"".join(e.get("body", b"") for e in events if e["type"] == "http.response.body"))
+    start = next(e for e in events if e["type"] == "http.response.start")
+    output = json.loads(b"".join(e.get("body", b"") for e in events if e["type"] == "http.response.body"))
+    return (start["status"], output, dict(start["headers"])) if with_headers else (start["status"], output)
 
 
 # ----------------------------------------------------------------------------- preprocesado
@@ -262,6 +263,10 @@ class RealModelTests(unittest.TestCase):
         import hashlib
         metricas = json.loads((ROOT / "docs" / "clasificacion_productos_metricas.json").read_text(encoding="utf-8"))
         self.assertEqual(hashlib.sha256(ps.PRODUCT_MODEL.read_bytes()).hexdigest(), metricas["artifact"]["sha256"])
+        status, body, headers = asyncio.run(post_file((FIXTURES / "prenda-botin.png").read_bytes(), with_headers=True))
+        self.assertEqual(status, 200)
+        self.assertTrue(body["modelo_entrenado"])
+        self.assertEqual(headers.get(b"x-model-sha256", b"").decode(), metricas["artifact"]["sha256"])
         self.assertTrue(metricas["acceptance"]["passed"])
 
 

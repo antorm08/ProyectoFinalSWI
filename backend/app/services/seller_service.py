@@ -19,7 +19,7 @@ def _get_bundle():
 
 
 def summary() -> dict:
-    if not SELLER_TABLE.exists():
+    if not SELLER_TABLE.is_file() or not SELLER_MODEL.is_file():
         return {"modelo_entrenado": False, "clusters": [], "vendedores": []}
     df = pd.read_csv(SELLER_TABLE)
     g = df.groupby(["cluster", "etiqueta"])

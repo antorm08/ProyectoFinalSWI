@@ -71,7 +71,7 @@ export interface DemandOutput {
 export interface ProductScore { categoria: string; confianza: number }
 export interface ProductOutput {
   categoria: string; confianza: number; top3: ProductScore[];
-  /** true si la confianza no alcanza el umbral validado: la categoría debe revisarse manualmente. */
+  /** true si la confianza no alcanza el umbral de revisión manual. */
   baja_confianza: boolean; umbral_confianza: number; modelo_entrenado: boolean;
 }
 export interface SellerRow {

@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 // Integración con la API local real: no se sustituyen resultados por métricas ficticias.
+const cnnMetrics = JSON.parse(readFileSync(new URL("../../docs/clasificacion_productos_metricas.json", import.meta.url), "utf8"));
 const routes = [
   ["/", "Dashboard ejecutivo"],
   ["/retrasos", "Tiempo de entrega"],
@@ -252,6 +254,7 @@ test("demanda muestra la banda y sus métricas cuando hay modelo entrenado", asy
   test.skip(!health.modelos.demanda, "Requiere backend/app/models/demand_model.joblib (python -m ml.train_demand)");
   await page.goto("/demanda");
   await expect(page.getByText(/Modelo medido fuera de muestra/)).toBeVisible();
+  await expect(page.getByText(/SARIMA.*banda calibrada/).first()).toBeVisible();
   await expect(page.getByText("Error típico del modelo", { exact: true })).toBeVisible();
   await page.getByText("Ver datos del gráfico en tabla", { exact: true }).click();
   await expect(page.getByRole("columnheader", { name: "Mínimo previsto" })).toBeVisible();
@@ -277,6 +280,32 @@ test("demanda ensancha la banda al subir el nivel de confianza", async ({ page }
   await page.getByLabel("Nivel de la banda", { exact: true }).selectOption("0.95");
   expect((await peticion).status()).toBe(200);
   await expect(page.getByText(/Banda 95 %/).first()).toBeVisible();
+  await expect(page.getByText(/Cobertura observada.*nominal del 80 %/)).toBeVisible();
+  await expect(page.getByText(/Cobertura observada.*nominal del 95 %/)).toHaveCount(0);
+});
+
+test("clustering muestra los segmentos reales y su subconjunto de vendedores", async ({ page }) => {
+  const health = await (await page.request.get("http://localhost:8000/api/health")).json();
+  test.skip(!health.modelos.vendedores, "Requiere el modelo y la tabla de vendedores");
+  const response = page.waitForResponse((res) => res.url().endsWith("/api/sellers/clusters"));
+  await page.goto("/vendedores");
+  const http = await response;
+  expect(http.status()).toBe(200);
+  const body = await http.json();
+  expect(body.modelo_entrenado).toBe(true);
+  expect(body.clusters).toHaveLength(3);
+  expect(body.clusters.reduce((total: number, group: { n_vendedores: number }) => total + group.n_vendedores, 0)).toBe(1766);
+  expect(body.vendedores).toHaveLength(300);
+  const seller = body.vendedores[0];
+  const { n_pedidos, facturacion, nota_media, tasa_retraso, dias_entrega_medio } = seller;
+  const assignment = await page.request.post("http://localhost:8000/api/sellers/assign", {
+    data: { n_pedidos, facturacion, nota_media, tasa_retraso, dias_entrega_medio },
+  });
+  expect(assignment.status()).toBe(200);
+  expect(await assignment.json()).toMatchObject({ cluster: seller.cluster, etiqueta: seller.etiqueta, modelo_entrenado: true });
+  await expect(page.getByRole("img", { name: /Dispersión de vendedores/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Logística problemática" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("row")).toHaveCount(301);
 });
 
 test("imágenes conserva multipart imagen y ejecuta inferencia", async ({ page }) => {
@@ -288,6 +317,7 @@ test("imágenes conserva multipart imagen y ejecuta inferencia", async ({ page }
   const res = await response;
   expect(res.status()).toBe(200);
   expect(res.request().headers()["content-type"]).toContain("multipart/form-data");
+  expect(await res.headerValue("X-Model-SHA256")).toBe(cnnMetrics.artifact.sha256);
   // Chromium no siempre expone el cuerpo multipart. Un 200 de este endpoint
   // confirma que FastAPI recibió el campo obligatorio `imagen`.
   expect(await res.json()).toMatchObject({ modelo_entrenado: true, categoria: "Botín", baja_confianza: false });
@@ -309,11 +339,11 @@ test("imágenes de ejemplo se clasifican con la API real", async ({ page }) => {
 
 test("imágenes avisa de baja confianza con una prenda ambigua real", async ({ page }) => {
   await page.goto("/productos");
-  // Camisa del test de Fashion-MNIST que el modelo duda entre abrigo y camisa (confianza < 0,7).
+  // Ejemplo del test oficial elegido para cubrir la rama de revisión (confianza < 0,7).
   await page.getByLabel("Seleccionar imagen", { exact: true }).setInputFiles(
     fileURLToPath(new URL("./fixtures/prenda-ambigua.png", import.meta.url)));
   await expect(page.getByText("Confianza baja: revisa la categoría")).toBeVisible();
-  await expect(page.getByText(/no alcanza el umbral validado de 70/)).toBeVisible();
+  await expect(page.getByText(/no alcanza el umbral de revisión de 70/)).toBeVisible();
   const audit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(audit.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((node) => node.target) }))).toEqual([]);
 });

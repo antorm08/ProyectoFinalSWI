@@ -1,0 +1,205 @@
+{
+  "sha256": "cd7877d089fd0986fe07b75e2ce6237043ce95c36be6fa089aa19b562ad9040d",
+  "published_sha256": "44aca28867b50caa2637b19a87aa0b92476f0e9ef1cea619b459026961e52129",
+  "test_loss": 0.23866089248657227,
+  "accuracy": 0.9152,
+  "macro_f1": 0.91453,
+  "per_class": {
+    "Camiseta/top": {
+      "precision": 0.8164,
+      "recall": 0.925,
+      "f1": 0.8673,
+      "support": 1000
+    },
+    "Pantalón": {
+      "precision": 0.998,
+      "recall": 0.981,
+      "f1": 0.9894,
+      "support": 1000
+    },
+    "Jersey": {
+      "precision": 0.8563,
+      "recall": 0.894,
+      "f1": 0.8748,
+      "support": 1000
+    },
+    "Vestido": {
+      "precision": 0.9206,
+      "recall": 0.928,
+      "f1": 0.9243,
+      "support": 1000
+    },
+    "Abrigo": {
+      "precision": 0.8932,
+      "recall": 0.828,
+      "f1": 0.8594,
+      "support": 1000
+    },
+    "Sandalia": {
+      "precision": 0.9917,
+      "recall": 0.953,
+      "f1": 0.972,
+      "support": 1000
+    },
+    "Camisa": {
+      "precision": 0.807,
+      "recall": 0.715,
+      "f1": 0.7582,
+      "support": 1000
+    },
+    "Zapatilla": {
+      "precision": 0.9456,
+      "recall": 0.974,
+      "f1": 0.9596,
+      "support": 1000
+    },
+    "Bolso": {
+      "precision": 0.9725,
+      "recall": 0.989,
+      "f1": 0.9807,
+      "support": 1000
+    },
+    "Botín": {
+      "precision": 0.9545,
+      "recall": 0.965,
+      "f1": 0.9597,
+      "support": 1000
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "Camiseta/top",
+      "Pantalón",
+      "Jersey",
+      "Vestido",
+      "Abrigo",
+      "Sandalia",
+      "Camisa",
+      "Zapatilla",
+      "Bolso",
+      "Botín"
+    ],
+    "rows_true_cols_pred": [
+      [
+        925,
+        0,
+        11,
+        9,
+        3,
+        2,
+        44,
+        0,
+        6,
+        0
+      ],
+      [
+        2,
+        981,
+        0,
+        10,
+        2,
+        0,
+        2,
+        0,
+        3,
+        0
+      ],
+      [
+        19,
+        0,
+        894,
+        11,
+        28,
+        0,
+        46,
+        0,
+        2,
+        0
+      ],
+      [
+        25,
+        1,
+        7,
+        928,
+        21,
+        0,
+        13,
+        0,
+        5,
+        0
+      ],
+      [
+        2,
+        0,
+        82,
+        23,
+        828,
+        0,
+        65,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        953,
+        0,
+        23,
+        2,
+        22
+      ],
+      [
+        157,
+        1,
+        50,
+        23,
+        44,
+        0,
+        715,
+        0,
+        10,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
+        0,
+        974,
+        0,
+        24
+      ],
+      [
+        3,
+        0,
+        0,
+        4,
+        1,
+        1,
+        0,
+        2,
+        989,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        1,
+        31,
+        0,
+        965
+      ]
+    ]
+  }
+}

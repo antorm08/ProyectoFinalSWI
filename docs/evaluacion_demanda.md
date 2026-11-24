@@ -1,8 +1,11 @@
 # Evaluación del pronóstico de demanda (componente 2)
 
+> Este es el estudio histórico que fijó la especificación y la calibración. Para la corrida que generó
+> el bundle de la demo, consulta [la auditoría de activación](auditoria_final_modulos.md#activación-en-featurecompletar-modulos-ia).
+
 **Ejecución:** 23 de noviembre de 2026.
 **Datos:** `olist_orders_dataset.csv`, SHA-256 `8df58ef3…9ecf`, idéntico al verificado en [validacion_olist.md](validacion_olist.md) §9.
-**Dictamen:** **apto con reservas**. El modelo activo bate a repetir la última semana en el promedio de ocho ventanas de prueba (MAE relativo 0,866) y su banda, calibrada con errores observados, cubre el 75 % de los días reales en el tramo reservado frente al 80 % nominal. Pero una regla trivial —la media por día de la semana— pronostica mejor que cualquier SARIMA probado, y eso debe constar.
+**Dictamen histórico:** **apto con reservas**. La especificación elegida bate a repetir la última semana en el promedio de ocho ventanas de prueba (MAE relativo 0,866) y su banda, calibrada con errores observados, cubre el 75 % de los días reales en el tramo reservado frente al 80 % nominal. Pero una regla trivial —la media por día de la semana— pronostica mejor que cualquier SARIMA probado, y eso debe constar.
 
 Métricas íntegras: [`resultados_demanda/metricas.json`](resultados_demanda/metricas.json). Artefacto y su protocolo: [`demanda_metricas.json`](demanda_metricas.json).
 
@@ -11,7 +14,7 @@ Reproducción, desde la raíz y con `backend/.venv` activo:
 ```bash
 python -m ml.train_demand --check-data      # auditoría de la serie, sin entrenar
 python -m ml.evaluate_demand                # 288 ajustes, ~3 min; escribe docs/resultados_demanda/
-python -m ml.train_demand                   # artefacto activo + docs/demanda_metricas.json
+python -m ml.train_demand --output candidatos/demand_model.joblib --metrics candidatos/demanda.json
 ```
 
 Entorno: Python 3.12.13, pandas 3.1.1, NumPy 2.5.5, statsmodels 0.15.0, matplotlib 3.11.2. Las cifras de este documento son resultados de esa ejecución.

@@ -1,5 +1,8 @@
 # Evaluación del Módulo de Clustering de Vendedores (Olist)
 
+> Este informe conserva el experimento anterior con k=4. La demo sirve el ajuste de **k=3**,
+> seleccionado por Silhouette; ver [métricas, perfiles y artefactos activos](activacion_vendedores_metricas.json).
+
 - **Vendedores elegibles (≥ 5 pedidos):** 1,766
 - **Variables utilizadas:** `n_pedidos, facturacion, nota_media, tasa_retraso, dias_entrega_medio` (con transformación `log1p` en `n_pedidos` y `facturacion`).
 - **Estabilidad del modelo (k=4, ARI promedio en 5 semillas):** `0.9491`

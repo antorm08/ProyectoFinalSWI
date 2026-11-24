@@ -56,7 +56,13 @@ CODIGO = (
     "ml/demand_series.py",
     "backend/app/services/demand_model.py",
     "backend/app/services/demand_calendar.py",
+    "backend/app/services/demand_coverage.py",
 )
+
+
+def report_path(path: Path) -> str:
+    path = Path(path).resolve()
+    return path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else path.as_posix()
 
 
 def metricas_publicables(informe: dict, ganador: str | None) -> dict | None:
@@ -78,7 +84,6 @@ def metricas_publicables(informe: dict, ganador: str | None) -> dict | None:
         "mae": desarrollo["mae"],
         "mase": desarrollo["mase"],
         "rel_mae": desarrollo["rel_mae"],
-        "cobertura_80": (informe.get("final_holdout") or {}).get("cobertura_80"),
         "baseline_mae": (informe.get("development") or {}).get("naive_estacional", {}).get("mae"),
         "periodo": periodo,
     }
@@ -110,7 +115,7 @@ def leer_seleccion(ruta: Path) -> tuple[Especificacion, dict | None, dict]:
     if not calibracion:
         print("AVISO: el informe no trae calibración; la banda saldrá del intervalo teórico.")
     return spec, calibracion, {
-        "origen": str(ruta.relative_to(ROOT)),
+        "origen": report_path(ruta),
         "ganador": seleccion.get("ganador"),
         "criterio": seleccion.get("criterio"),
         "nombre": spec.nombre,
@@ -127,6 +132,13 @@ def auditar(serie, ventana) -> dict:
 
 def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
          metrics_path: Path = DEFAULT_METRICS, selection: Path = DEFAULT_SELECTION) -> dict:
+    output, metrics_path = Path(output), Path(metrics_path)
+    if not check_only:
+        if output.resolve() == metrics_path.resolve():
+            raise ValueError("El modelo y su informe requieren rutas distintas")
+        for path in (output, metrics_path):
+            if path.exists():
+                raise FileExistsError(f"Respalda los resultados anteriores o elige una ruta nueva: {path}")
     inicio = time.perf_counter()
     arranque = ahora_utc()
 
@@ -197,8 +209,7 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
     bundle = empaquetar(
         datos, spec, completo, calibracion=calibracion,
         window=auditoria["window"],
-        metrics=(procedencia.get("metricas_publicadas")
-                 or {k: v for k, v in evaluacion.items() if k != "convergio"}),
+        metrics={k: v for k, v in evaluacion.items() if k != "convergio"},
         selection=procedencia,
         trained_at_utc=arranque,
         versions=versiones(),
@@ -210,7 +221,8 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
 
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(bundle, output)
+    with output.open("xb") as file:
+        joblib.dump(bundle, file)
     print(f"Guardado en {output} ({output.stat().st_size} bytes)")
 
     informe = {
@@ -231,9 +243,10 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
         "calibration": ({k: v for k, v in calibracion.items() if k != "errores_relativos"}
                         if calibracion else None),
         "holdout": evaluacion,
-        "published_metrics": procedencia.get("metricas_publicadas"),
+        "published_metrics": bundle["metrics"],
+        "historical_development_metrics": procedencia.get("metricas_publicadas"),
         "artifact": {
-            "path": str(output.relative_to(ROOT)),
+            "path": report_path(output),
             "schema": ESQUEMA,
             "bytes": output.stat().st_size,
             "sha256": __import__("hashlib").sha256(output.read_bytes()).hexdigest(),
@@ -256,9 +269,9 @@ def main(check_only: bool = False, output: Path = DEFAULT_OUTPUT,
     }
     metrics_path = Path(metrics_path)
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
-    metrics_path.write_text(
-        json.dumps(informe, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8"
-    )
+    with metrics_path.open("x", encoding="utf-8") as file:
+        json.dump(informe, file, ensure_ascii=False, indent=2, allow_nan=False)
+        file.write("\n")
     print(f"Métricas en {metrics_path}")
     return informe
 

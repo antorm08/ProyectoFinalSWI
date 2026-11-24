@@ -17,7 +17,7 @@ def health():
             "tiempo_entrega": config.DELIVERY_DURATION_MODEL.is_file(),
             "demanda": config.DEMAND_MODEL.exists(),
             "productos": config.PRODUCT_MODEL.exists(),
-            "vendedores": config.SELLER_MODEL.exists(),
+            "vendedores": config.SELLER_MODEL.is_file() and config.SELLER_TABLE.is_file(),
             "resumen": True,  # TextRank no requiere entrenamiento
         },
     }

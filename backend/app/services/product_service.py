@@ -1,4 +1,5 @@
 """Clasificación de productos por imagen (CNN entrenada con Fashion-MNIST)."""
+import hashlib
 import io
 
 import numpy as np
@@ -15,6 +16,7 @@ DIFF_FONDO = 30                 # diferencia de gris (0-255) para considerar un 
 MIN_PROPORCION = 0.01           # fila/columna con <1 % de píxeles de prenda = ruido, no recorta
 
 _model = None
+_model_sha256 = None
 
 
 class InvalidImageError(ValueError):
@@ -26,12 +28,18 @@ class NoObjectError(ValueError):
 
 
 def _get_model():
-    global _model
+    global _model, _model_sha256
     if _model is None and PRODUCT_MODEL.exists():
         import torch  # import diferido: torch es pesado y opcional
-        _model = torch.jit.load(str(PRODUCT_MODEL), map_location="cpu")
-        _model.eval()
+        payload = PRODUCT_MODEL.read_bytes()
+        model = torch.jit.load(io.BytesIO(payload), map_location="cpu").eval()
+        _model_sha256 = hashlib.sha256(payload).hexdigest()
+        _model = model
     return _model
+
+
+def loaded_model_sha256() -> str | None:
+    return _model_sha256 if _model is not None else None
 
 
 def _open(image_bytes: bytes) -> Image.Image:

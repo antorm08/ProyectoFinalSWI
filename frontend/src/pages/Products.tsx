@@ -82,7 +82,7 @@ export default function Products() {
         <ErrorBox>{validation || action.error}</ErrorBox>
         {action.loading ? <LoadingState label="Clasificando imagen…" /> : result ? <div aria-live="polite">
           {result.modelo_entrenado ? <>
-            {result.baja_confianza && <div className="mt-3"><Notice title="Confianza baja: revisa la categoría" tone="warning">La confianza del modelo ({percent(result.confianza)}) no alcanza el umbral validado de {percent(result.umbral_confianza)}. Comprueba manualmente la categoría o prueba con otra foto.</Notice></div>}
+            {result.baja_confianza && <div className="mt-3"><Notice title="Confianza baja: revisa la categoría" tone="warning">La confianza del modelo ({percent(result.confianza)}) no alcanza el umbral de revisión de {percent(result.umbral_confianza)}. Comprueba manualmente la categoría o prueba con otra foto.</Notice></div>}
             <div className={`my-4 rounded-lg p-3 ${result.baja_confianza ? "bg-amber-50" : "bg-brand-50"}`}><p className={`text-xs font-semibold ${result.baja_confianza ? "text-amber-800" : "text-brand-700"}`}>Categoría propuesta</p><p className="mt-1 text-2xl font-bold tracking-tight">{result.categoria}</p><p className="mt-2 text-sm text-slate-600">Confianza del modelo: <strong className={result.baja_confianza ? "text-amber-800" : "text-brand-700"}>{percent(result.confianza)}</strong></p></div>
             <h3 className="mb-3 text-sm font-semibold">Categorías más probables</h3><ol className="space-y-3">{result.top3.map((item, i) => <li key={item.categoria}><div className="mb-1.5 flex items-center justify-between gap-3 text-sm"><span className="text-slate-700"><span className="mr-2 text-xs text-slate-500">0{i + 1}</span>{item.categoria}</span><strong className="tabular-nums">{percent(item.confianza)}</strong></div><div className="h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className={`h-full rounded-full ${i === 0 ? (result.baja_confianza ? "bg-amber-500" : "bg-brand-600") : "bg-slate-400"}`} style={{ width: `${Math.max(0, Math.min(100, item.confianza * 100))}%` }} /></div></li>)}</ol>
             <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">La confianza no equivale a precisión validada.</p>
@@ -93,8 +93,8 @@ export default function Products() {
     <details className="card mt-4"><summary className="min-h-11 py-2.5 text-sm font-semibold text-slate-700">Acerca del clasificador</summary>
       <div className="space-y-2 text-sm leading-5 text-slate-500">
         <p>Red neuronal convolucional (CNN) entrenada con Fashion-MNIST: diez categorías de prendas y accesorios (camiseta/top, pantalón, jersey, vestido, abrigo, sandalia, camisa, zapatilla, bolso y botín) en imágenes de 28 × 28 píxeles en gris.</p>
-        <p>Acierta el 92,5 % de las 10 000 imágenes de prueba. La categoría más difícil es camisa, que se confunde con camiseta, jersey y abrigo.</p>
-        <p>Antes de clasificar, la foto se pasa a gris, se recorta a la prenda y se escala a 28 × 28. Si la confianza es inferior al umbral validado (70 %), el resultado se marca para revisión.</p>
+        <p>Las métricas de cada versión se miden en las 10 000 imágenes de prueba de Fashion-MNIST; no estiman el rendimiento en fotos de un catálogo real.</p>
+        <p>Antes de clasificar, la foto se pasa a gris, se recorta a la prenda y se escala a 28 × 28. Si la confianza es inferior al 70 %, el resultado se marca para revisión. El modelo no reconoce automáticamente imágenes fuera de su dominio.</p>
       </div>
     </details>
   </>;

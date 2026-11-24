@@ -32,6 +32,7 @@ if str(ROOT / "backend") not in sys.path:
     sys.path.insert(0, str(ROOT / "backend"))
 from app.services.demand_calendar import COLUMNAS as EXOG_COLUMNAS  # noqa: E402
 from app.services.demand_calendar import calendar_exog  # noqa: E402
+from app.services.demand_coverage import coverage_bounds  # noqa: E402
 
 #: Ventana del script original, conservada solo para reproducir su diagnóstico.
 VENTANA_HEREDADA = ("2017-01-01", "2018-08-15")
@@ -92,20 +93,6 @@ class Ventana:
         return dict(self.audit)
 
 
-def _rachas(mask: pd.Series) -> list[tuple[int, int]]:
-    """Rachas contiguas de True como pares [inicio, fin] de posiciones."""
-    valores = mask.to_numpy()
-    if not valores.any():
-        return []
-    cambios = np.flatnonzero(np.diff(valores.astype(np.int8)))
-    bordes = np.concatenate(([0], cambios + 1, [len(valores)]))
-    rachas = []
-    for desde, hasta in zip(bordes[:-1], bordes[1:]):
-        if valores[desde]:
-            rachas.append((int(desde), int(hasta) - 1))
-    return rachas
-
-
 def coverage_window(
     serie: pd.Series,
     *,
@@ -144,30 +131,9 @@ def coverage_window(
     if len(serie) < PERIODO * 2:
         raise ValueError("Serie demasiado corta para evaluar su cobertura")
 
-    huecos = [r for r in _rachas(serie.eq(0)) if r[1] - r[0] + 1 >= hueco_minimo]
-    suma7 = serie.rolling(PERIODO).sum()
-    nivel = suma7.rolling(referencia).median().shift(PERIODO)
-    truncado = (suma7 < fraccion * nivel).fillna(False)
-
-    descenso_desde = None
-    if truncado.any():
-        posicion = int(serie.index.get_loc(truncado[truncado].index[0]))
-        valores = suma7.to_numpy()
-        while posicion - 1 >= 0 and valores[posicion - 1] > valores[posicion]:
-            posicion -= 1
-        if posicion < len(serie):
-            descenso_desde = posicion
-            truncado.iloc[posicion:] = True
-
-    invalido = pd.Series(False, index=serie.index)
-    for desde, hasta in huecos:
-        invalido.iloc[desde : hasta + 1] = True
-    invalido |= truncado
-
-    validas = _rachas(~invalido)
-    if not validas:
-        raise ValueError("No queda ningún tramo con cobertura utilizable")
-    desde, hasta = max(validas, key=lambda r: r[1] - r[0])
+    desde, hasta, huecos, descenso_desde = coverage_bounds(
+        serie, hueco_minimo=hueco_minimo, fraccion=fraccion, referencia=referencia
+    )
     recorte = serie.iloc[desde : hasta + 1]
     if len(recorte) < referencia:
         raise ValueError(
@@ -192,7 +158,7 @@ def coverage_window(
             for a, b in huecos
         ],
         "first_truncated_day": (
-            str(truncado[truncado].index[0].date()) if truncado.any() else None
+            str(serie.index[descenso_desde].date()) if descenso_desde is not None else None
         ),
         "final_descent_start": (
             str(serie.index[descenso_desde].date()) if descenso_desde is not None else None

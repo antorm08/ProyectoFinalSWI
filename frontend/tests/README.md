@@ -5,7 +5,8 @@
 - Dependencias locales: `npm ci`.
 - API real en `http://localhost:8000`.
 - Microsoft Edge instalado. La configuración utiliza `channel: "msedge"` y no descarga un navegador.
-- Para probar la inferencia de imágenes debe existir el modelo CNN y estar disponible PyTorch.
+- Para verificar inferencia y segmentos reales instala los artefactos de la
+  [guía de activación](../../docs/auditoria_final_modulos.md). El SHA-256 servido por la CNN se contrasta con su manifiesto.
 - El caso de reseñas por vendedor sin datos espera un identificador inexistente y una respuesta 404.
 
 ## Comandos
@@ -20,7 +21,7 @@ Playwright reutiliza el frontend en el puerto 5173 o lo inicia si no está dispo
 
 Se comprueban las seis rutas a 375, 768, 1024 y 1440 píxeles, errores JavaScript, desbordamiento horizontal, reglas automatizadas WCAG A/AA con axe, navegación por teclado, menú móvil y contratos HTTP de las interacciones.
 
-Las solicitudes de predicción, demanda, imágenes y reseñas se envían a la API real. La imagen de diagnóstico y el texto de prueba son entradas de prueba, no registros comerciales. Solo se interceptan peticiones para simular fallos de red o retrasar una respuesta real y comprobar su cancelación.
+Las solicitudes de predicción, demanda, imágenes, vendedores y reseñas se envían a la API real. La imagen de diagnóstico y el texto de prueba son entradas de prueba, no registros comerciales. Las intercepciones prueban estados de error y que una respuesta tardía no restaura resultados de un escenario editado.
 
 Se guardan capturas y resultados en `test-results/`, y el informe HTML en `playwright-report/`; ambos directorios están ignorados por Git.
 

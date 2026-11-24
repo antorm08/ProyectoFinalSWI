@@ -1,10 +1,11 @@
 # Informe técnico – CommerceAI
 
-> Plantilla con los apartados exigidos por el enunciado. Completar en cada sección.
+> Las cifras identificadas como históricas no describen el artefacto instalado. El estado de la demo,
+> las huellas y la reproducción de cada módulo están en [la auditoría de activación](auditoria_final_modulos.md).
 
 ## 1. Descripción de funcionalidades de la aplicación
 - Panel general
-- Predicción del riesgo de retraso
+- Estimación del tiempo de entrega
 - Pronóstico de demanda
 - Clasificación de productos por imagen
 - Segmentación de vendedores
@@ -15,12 +16,18 @@
 ### 2.2 Frontend (React + TypeScript)
 ### 2.3 Backend / API (FastAPI)
 ### 2.4 Componentes de IA
-#### 2.4.1 Predicción de retraso – datos, variables, modelo, métricas (ROC-AUC, F1)
+#### 2.4.1 Tiempo de entrega
+
+El modelo servido es un `HistGradientBoostingRegressor` sobre datos de Olist. No usa el plazo prometido por
+el operador. MAE 4,60 días en desarrollo; en agosto retrospectivo, MAE 3,31 y RMSE 4,33 días.
+La [evaluación de ETA](evaluacion_tiempo_entrega.md) documenta el sesgo en entregas largas. El clasificador
+de riesgo es un endpoint histórico separado y no alimenta el formulario.
+
 #### 2.4.2 Series temporales – serie diaria, SARIMAX, validación (MAE, MASE, cobertura)
 
 **Problema.** Un operador logístico necesita saber cuántos pedidos entrarán cada día de las próximas semanas para
 dimensionar almacén, personal de preparación y contratación de transporte. Un número suelto no sirve para eso: hace
-falta un rango con una probabilidad asociada, porque dimensionar al valor central deja corto la mitad de los días.
+conviene mostrar la incertidumbre diaria, sin interpretar la banda como una garantía.
 
 **Datos.** Serie diaria de **pedidos creados** a partir de `order_purchase_timestamp` de Olist, de cualquier estado.
 Filtrar por entregados introduciría sesgo de supervivencia: un pedido cancelado también fue demanda.
@@ -71,12 +78,16 @@ backtesting, por bloques semanales del horizonte. En el tramo reservado la cober
 80 % nominal. La mediana del error pasa de +5 % a los pocos días a −23 % a los tres meses, y la banda recoge esa
 asimetría; la teórica, simétrica por construcción, no podía.
 
-**Resultados en el tramo reservado** (2018-07-22 a 2018-08-18): MAE 60,99, MASE 1,740, relMAE **1,229**, cobertura del
+**Resultados históricos en el tramo reservado** (2018-07-22 a 2018-08-18): MAE 60,99, MASE 1,740, relMAE **1,229**, cobertura del
 80 % → **75,0 %**. En esa ventana el modelo pierde contra el baseline por un cambio de nivel real: julio promedia 203
 pedidos/día y los dieciocho primeros días de agosto promedian 284, con picos de 370. Una ventana de 28 días no arbitra
 entre modelos: en los ocho orígenes de desarrollo el relMAE del mismo modelo va de 0,60 a 1,14. Por eso el criterio de
 aceptación juzga la precisión sobre el promedio de las ocho ventanas (0,866 < 1 ✅) y reserva el tramo final para lo
-que sí comprueba limpiamente, que la calibración funciona en días que no la produjeron (75 % ✅).
+que sí permite observar la cobertura en días que no produjeron la calibración (75 %).
+
+La corrida que generó el artefacto activo obtuvo MAE 46,29 y RMSE 57,54 pedidos/día frente a 49,64 y 63,34
+del baseline, con cobertura de 82,14 % para el 80 % nominal. Es el mismo corte, no evidencia nueva de
+generalización. Véanse [las métricas del bundle](demanda_metricas.json).
 
 **Integración en la aplicación.** `GET /api/demand/forecast?horizonte=&historico=&nivel=` devuelve el histórico
 reciente y el pronóstico; cada punto futuro lleva `inferior` y `superior`, y la respuesta incluye el modelo, el ancla
@@ -131,13 +142,17 @@ una imagen en ~2 ms (preprocesado incluido, CPU Ryzen 5 3600), suficiente para l
 - El modelo se exporta como TorchScript (`backend/app/models/product_cnn.pt`), con verificación de que el archivo recargado
   reproduce las predicciones. Protocolo, historial y métricas: `docs/clasificacion_productos_metricas.json`.
 
-**Resultados en test** (10 000 imágenes no vistas):
+**Resultados históricos en test** (10 000 imágenes no vistas, no atribuibles a la CNN instalada):
 
 | Métrica | Valor |
 |---|---:|
 | **Accuracy** | **92,46 %** (objetivo ≥ 91 %) |
 | F1 macro | 0,924 |
 | Accuracy en validación (época 20 de 20) | 92,77 % |
+
+La versión instalada obtuvo **92,14 % de accuracy**, **0,92138 de precisión macro**, **0,92140 de recall macro**
+y **0,92127 de F1 macro**. Su [manifiesto](clasificacion_productos_metricas.json) incluye la matriz de confusión
+y el SHA-256 comprobado en la respuesta de FastAPI. Los resultados por clase del párrafo siguiente son históricos.
 
 Las mejores categorías son pantalón (F1 0,994), bolso (0,989) y sandalia (0,986). La más difícil es **camisa** (F1 0,773):
 la matriz de confusión muestra que los errores se concentran entre prendas de torso, cuya silueta a 28 × 28 px apenas
@@ -178,7 +193,13 @@ categorías) y no distingue detalles finos como colores o estampados. Análisis 
 modelo real) y pruebas E2E con Playwright de la página de clasificación en cuatro tamaños de pantalla, con auditoría de
 accesibilidad.
 
-#### 2.4.4 Clustering – métricas por vendedor, K-Means, elección de k (codo, silhouette)
+#### 2.4.4 Clustering – métricas por vendedor, K-Means y Silhouette
+
+Se agregaron pedidos elegibles de Olist a nivel vendedor, con un mínimo de cinco pedidos: 1.766 vendedores.
+K-Means eligió k=3 por el mejor Silhouette de k=2–8 (0,3053); el k=4 histórico obtuvo 0,2515. Los perfiles
+son alto volumen (627), estables (837) y logística problemática (302). La [evaluación de activación](activacion_vendedores_metricas.json)
+incluye perfiles, barrido completo y huellas del modelo y la tabla; no son segmentos validados externamente.
+
 #### 2.4.5 Resumen de texto – TextRank, ejemplos de resúmenes
 
 **Problema.** Un marketplace acumula miles de reseñas y nadie puede leerlas todas. El componente resume **qué reclaman y

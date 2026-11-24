@@ -6,13 +6,15 @@ import { date, number } from "../utils/format";
 
 const porcentaje = (nivel: number | null) => `${Math.round((nivel ?? 0.8) * 100)} %`;
 
-export function DemandSource({ trained, metricas, nivel }: { trained: boolean; metricas?: DemandMetrics | null; nivel?: number | null }) {
+export function DemandSource({ trained, metricas, modelo }: { trained: boolean; metricas?: DemandMetrics | null; modelo?: string }) {
   const { data, error, loading } = useSystem();
-  if (trained) return <p className="text-xs leading-5 text-slate-500">
-    {metricas
-      ? `Modelo medido fuera de muestra: ${number(metricas.mae, 1)} pedidos/día de error absoluto medio (${metricas.periodo}); la banda del ${porcentaje(nivel ?? null)} contuvo el ${number((metricas.cobertura_80 ?? 0) * 100)} % de los días reales.`
-      : "Estimación del modelo sobre su histórico de referencia; precisión no verificada."}
-  </p>;
+  if (trained) return <div className="space-y-1 text-xs leading-5 text-slate-600">
+    {modelo && <p className="font-semibold">{modelo}</p>}
+    <p>{metricas
+      ? `Modelo medido fuera de muestra: ${number(metricas.mae, 1)} pedidos/día de error absoluto medio (${metricas.periodo}).`
+      : "Estimación del modelo sobre su histórico de referencia; precisión no verificada."}</p>
+    {metricas?.cobertura_80 != null && <p>{`Cobertura observada en evaluación: ${number(metricas.cobertura_80 * 100, 1)} % de los días para la banda nominal del 80 %.`}</p>}
+  </div>;
   if (loading || error || !data) return <Notice title="Procedencia no confirmada" tone="warning">Pronóstico provisional. No se pudo distinguir entre histórico Olist y datos sintéticos; no asumir actividad real.</Notice>;
   return data.datos_olist.orders
     ? <Notice title="Estimación orientativa" tone="warning">Datos históricos de Olist. Sin modelo entrenado, se repite la última semana.</Notice>
@@ -67,8 +69,8 @@ export default function DemandChart({ data, compact = false }: { data: DemandOut
           <YAxis tick={{ fontSize: 11, fill: "#64748b" }} tickLine={false} axisLine={false} />
           <Tooltip content={<Etiqueta nivel={nivel} />} />
           <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-          <Area dataKey="bandaBase" stackId="banda" stroke="none" fill="none" legendType="none" isAnimationActive={false} activeDot={false} tooltipType="none" />
-          <Area dataKey="bandaRango" stackId="banda" name={`Banda ${porcentaje(nivel)}`} stroke="none" fill="#2563eb" fillOpacity={0.14} isAnimationActive={false} activeDot={false} tooltipType="none" />
+          {conBanda && <Area dataKey="bandaBase" stackId="banda" stroke="none" fill="none" legendType="none" isAnimationActive={false} activeDot={false} tooltipType="none" />}
+          {conBanda && <Area dataKey="bandaRango" stackId="banda" name={`Banda ${porcentaje(nivel)}`} stroke="none" fill="#2563eb" fillOpacity={0.14} isAnimationActive={false} activeDot={false} tooltipType="none" />}
           <Line dataKey="historico" name="Histórico" stroke="#64748b" strokeWidth={2} dot={false} isAnimationActive={false} />
           <Line dataKey="pronostico" name="Pronóstico" stroke="#2563eb" strokeWidth={2.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
         </ComposedChart>

@@ -1,18 +1,20 @@
 # Evaluación del clasificador de productos por imagen (CNN · Fashion-MNIST)
 
+> Evaluación histórica del artefacto publicado originalmente. Las cifras de robustez de esta página
+> no se atribuyen a candidatos nuevos; consulta [la auditoría de activación](auditoria_final_modulos.md).
+
 **Ejecución:** 23 de noviembre de 2026.  
 **Dictamen:** cumple el objetivo académico (**accuracy en test 92,46 % ≥ 91 %**). Con el preprocesado del backend, que recorta
 la imagen a la prenda, mantiene **90–92 %** con fotos simuladas de catálogo, encuadre amplio y fondo gris con ruido (antes
 del recorte: 15–37 % con encuadre amplio). Sigue limitado a siluetas de prendas sobre fondo liso (sección 6).
 
-Resultados íntegros: [clasificacion_productos_metricas.json](clasificacion_productos_metricas.json) (entrenamiento, protocolo,
-historial) y [resultados_clasificacion_productos/metricas.json](resultados_clasificacion_productos/metricas.json) (evaluación,
-umbrales, robustez). Reproducción:
+Resultados históricos: [resultados_clasificacion_productos/metricas.json](resultados_clasificacion_productos/metricas.json)
+(evaluación, umbrales, robustez). El archivo [clasificacion_productos_metricas.json](clasificacion_productos_metricas.json)
+identifica el entrenamiento de la versión para la demo. Reproducción del protocolo:
 
 ```bash
-cd ml
-python train_products.py      # ~15 min en CPU; escribe backend/app/models/product_cnn.pt
-python evaluate_products.py   # ~1 min; escribe docs/resultados_clasificacion_productos/
+python -m ml.train_products --threads 4 --output candidatos/product_cnn.pt --metrics candidatos/productos.json
+python -m ml.evaluate_products --out candidatos/robustez  # evalúa el modelo que esté instalado
 ```
 
 ## 1. Datos y protocolo

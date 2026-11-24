@@ -4,6 +4,7 @@ Ningún test optimiza un SARIMAX. Los artefactos se construyen con `smooth()`
 sobre parámetros fijados a mano, que aplica el filtro de Kalman sin ajustar nada.
 """
 import asyncio
+import hashlib
 import json
 import sys
 import tempfile
@@ -48,6 +49,24 @@ async def _get(path):
 
 def get(path):
     return asyncio.run(_get(path))
+
+
+@unittest.skipUnless(demand_service.DEMAND_MODEL.is_file(), "Requiere el artefacto real de demanda")
+class ApiConArtefactoActivo(unittest.TestCase):
+    def test_holdout_publicado_corresponde_al_bundle_en_servicio(self):
+        manifest = json.loads((ROOT / "docs" / "demanda_metricas.json").read_text(encoding="utf-8"))
+        self.assertEqual(hashlib.sha256(demand_service.DEMAND_MODEL.read_bytes()).hexdigest(),
+                         manifest["artifact"]["sha256"])
+        status, body = get(f"{RUTA}?horizonte=90&historico=7")
+        self.assertEqual(status, 200)
+        self.assertTrue(body["modelo_entrenado"])
+        self.assertEqual(body["ancla"], "2018-08-18")
+        self.assertEqual(body["metricas"]["mae"], manifest["holdout"]["mae"])
+        self.assertEqual(body["metricas"]["cobertura_80"], manifest["holdout"]["cobertura_80"])
+        future = [point for point in body["serie"] if point["tipo"] == "pronostico"]
+        self.assertEqual(len(future), 90)
+        self.assertEqual(future[0]["fecha"], "2018-08-19")
+        self.assertTrue(all(0 <= point["inferior"] <= point["valor"] <= point["superior"] for point in future))
 
 
 def serie_demo(dias=240, inicio="2018-01-01"):
@@ -210,6 +229,16 @@ class ApiSinModelo(unittest.TestCase):
         futuros = [p for p in cuerpo["serie"] if p["tipo"] == "pronostico"]
         self.assertEqual(len(futuros), 14)
         self.assertTrue(all(p["inferior"] is None for p in futuros))
+
+    @unittest.skipUnless(olist.available("orders"), "Requiere los pedidos reales de Olist")
+    def test_olist_provisional_no_repite_la_cola_truncada(self):
+        estado, cuerpo = get(f"{RUTA}?horizonte=7&historico=7")
+        self.assertEqual(estado, 200)
+        self.assertFalse(cuerpo["modelo_entrenado"])
+        self.assertEqual(cuerpo["ancla"], "2018-08-18")
+        historico, futuro = cuerpo["serie"][:7], cuerpo["serie"][7:]
+        self.assertEqual([p["valor"] for p in historico], [p["valor"] for p in futuro])
+        self.assertGreater(sum(p["valor"] for p in futuro), 1000)
 
     def test_un_artefacto_corrupto_no_produce_un_500(self):
         self.ruta.write_bytes(b"esto no es un joblib")

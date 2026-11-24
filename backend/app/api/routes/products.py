@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 
 from app.core.config import PRODUCT_MAX_BYTES
 from app.schemas import ProductOutput
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/products", tags=["3. Clasificación de imágenes"])
              responses={400: {"description": "El archivo no es una imagen válida"},
                         413: {"description": "La imagen supera el tamaño máximo"},
                         422: {"description": "No se detecta ninguna prenda en la imagen"}})
-async def classify(imagen: UploadFile = File(...)):
+async def classify(response: Response, imagen: UploadFile = File(...)):
     if not (imagen.content_type or "").startswith("image/"):
         raise HTTPException(400, "El archivo debe ser una imagen")
     data = await imagen.read(PRODUCT_MAX_BYTES + 1)
@@ -20,7 +20,10 @@ async def classify(imagen: UploadFile = File(...)):
     if not data:
         raise HTTPException(400, "El archivo está vacío")
     try:
-        return product_service.classify(data)
+        result = product_service.classify(data)
+        if result.modelo_entrenado and (sha256 := product_service.loaded_model_sha256()):
+            response.headers["X-Model-SHA256"] = sha256
+        return result
     except product_service.InvalidImageError as exc:
         raise HTTPException(400, str(exc)) from None
     except product_service.NoObjectError as exc:
