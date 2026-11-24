@@ -176,6 +176,67 @@ test("demanda aplica horizonte sin solicitudes por cada movimiento", async ({ pa
   await expect(page.getByRole("table")).toBeVisible();
 });
 
+test("demanda declara desde qué día pronostica", async ({ page }) => {
+  await page.goto("/demanda");
+  await expect(page.getByText(/El pronóstico arranca el día siguiente al último con datos/)).toBeVisible();
+});
+
+test("el contrato del pronóstico respeta la banda y sus límites", async ({ page }) => {
+  const api = "http://localhost:8000/api/demand/forecast";
+  const body = await (await page.request.get(`${api}?horizonte=14&historico=30&nivel=0.8`)).json();
+  expect(body.serie.filter((p: any) => p.tipo === "historico")).toHaveLength(30);
+  const futuros = body.serie.filter((p: any) => p.tipo === "pronostico");
+  expect(futuros).toHaveLength(14);
+  for (const punto of body.serie.filter((p: any) => p.tipo === "historico")) {
+    expect(punto.inferior).toBeNull();
+    expect(punto.superior).toBeNull();
+  }
+  if (body.modelo_entrenado) {
+    expect(body.ancla).toBeTruthy();
+    expect(body.nivel_confianza).toBe(0.8);
+    for (const punto of futuros) {
+      expect(punto.inferior).toBeLessThanOrEqual(punto.valor);
+      expect(punto.valor).toBeLessThanOrEqual(punto.superior);
+      expect(punto.inferior).toBeGreaterThanOrEqual(0);
+    }
+  }
+  // El horizonte está acotado a 90 días: no hay dos ciclos anuales que extrapolar.
+  expect((await page.request.get(`${api}?horizonte=200`)).status()).toBe(422);
+  expect((await page.request.get(`${api}?nivel=1.5`)).status()).toBe(422);
+});
+
+test("demanda muestra la banda y sus métricas cuando hay modelo entrenado", async ({ page }) => {
+  const health = await (await page.request.get("http://localhost:8000/api/health")).json();
+  test.skip(!health.modelos.demanda, "Requiere backend/app/models/demand_model.joblib (python -m ml.train_demand)");
+  await page.goto("/demanda");
+  await expect(page.getByText(/Modelo medido fuera de muestra/)).toBeVisible();
+  await expect(page.getByText("Error típico del modelo", { exact: true })).toBeVisible();
+  await page.getByText("Ver datos del gráfico en tabla", { exact: true }).click();
+  await expect(page.getByRole("columnheader", { name: "Mínimo previsto" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Máximo previsto" })).toBeVisible();
+  const audit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(audit.violations.map((v) => v.id)).toEqual([]);
+});
+
+test("demanda ensancha la banda al subir el nivel de confianza", async ({ page }) => {
+  const health = await (await page.request.get("http://localhost:8000/api/health")).json();
+  test.skip(!health.modelos.demanda, "Requiere un modelo de demanda entrenado");
+  await page.goto("/demanda");
+  const ancho = async () => {
+    const body = await (await page.request.get("http://localhost:8000/api/demand/forecast?horizonte=10&nivel=0.95")).json();
+    const estrecho = await (await page.request.get("http://localhost:8000/api/demand/forecast?horizonte=10&nivel=0.8")).json();
+    const suma = (d: any) => d.serie.filter((p: any) => p.tipo === "pronostico")
+      .reduce((t: number, p: any) => t + (p.superior - p.inferior), 0);
+    return [suma(body), suma(estrecho)];
+  };
+  const [ancha, estrecha] = await ancho();
+  expect(ancha).toBeGreaterThan(estrecha);
+  const peticion = page.waitForResponse((res) => res.url().includes("nivel=0.95"));
+  await page.getByLabel("Nivel de la banda", { exact: true }).selectOption("0.95");
+  expect((await peticion).status()).toBe(200);
+  await expect(page.getByText(/Banda 95 %/).first()).toBeVisible();
+});
+
 test("imágenes conserva multipart imagen y ejecuta inferencia", async ({ page }) => {
   await page.goto("/productos");
   const response = page.waitForResponse((res) => res.url().endsWith("/api/products/classify") && res.request().method() === "POST");

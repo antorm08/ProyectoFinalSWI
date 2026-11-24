@@ -1,0 +1,333 @@
+{
+  "started_at_utc": "2026-11-23T19:53:40+00:00",
+  "protocol": {
+    "target": "pedidos creados por día, cualquier estado",
+    "ventana": "regla de cobertura, no literales de fecha",
+    "holdout_dias": 28,
+    "nivel_banda": 0.8,
+    "nota": "el artefacto se reajusta con toda la ventana; las métricas publicadas son las del holdout, calculadas antes de ese reajuste"
+  },
+  "versions": {
+    "python": "3.12.13",
+    "pandas": "3.1.1",
+    "numpy": "2.5.5",
+    "statsmodels": "0.15.0",
+    "scikit-learn": "1.9.1",
+    "matplotlib": "3.11.2",
+    "joblib": "1.6.0"
+  },
+  "source_csv_sha256": {
+    "olist_orders_dataset.csv": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf"
+  },
+  "code_sha256": {
+    "ml/train_demand.py": "0bcd553b15a1c51727ddb1f3b2614a4af5e5172987a8e711f5109044260f84ed",
+    "ml/demand_series.py": "820ca2c16e6b3d5c2164ad439b832b616f26973d0079842c480e76a5f10cca7e",
+    "backend/app/services/demand_model.py": "dccb26b3667b0ccffbafe22865c6bb94dc9804e376e1a6c79d7cf3f92e6dfbe8",
+    "backend/app/services/demand_calendar.py": "4d62e7ddae97a691ac9c8db916dcb175f88f021de29d089d269130eb85e26bb8"
+  },
+  "window": {
+    "serie_completa": {
+      "source_orders": 99441,
+      "purchase_min": "2016-09-04 21:15:19",
+      "purchase_max": "2018-10-17 17:30:18",
+      "days_spanned": 774,
+      "days_without_records": 140,
+      "orders_in_series": 99441
+    },
+    "rule": {
+      "hueco_minimo_dias": 2,
+      "fraccion_nivel": 0.25,
+      "referencia_dias": 180,
+      "periodo": 7
+    },
+    "input": {
+      "source_orders": 99441,
+      "purchase_min": "2016-09-04 21:15:19",
+      "purchase_max": "2018-10-17 17:30:18",
+      "days_spanned": 774,
+      "days_without_records": 140,
+      "orders_in_series": 99441
+    },
+    "coverage_gaps": [
+      {
+        "inicio": "2016-09-06",
+        "fin": "2016-09-12",
+        "dias": 7
+      },
+      {
+        "inicio": "2016-09-16",
+        "fin": "2016-10-01",
+        "dias": 16
+      },
+      {
+        "inicio": "2016-10-11",
+        "fin": "2016-10-21",
+        "dias": 11
+      },
+      {
+        "inicio": "2016-10-23",
+        "fin": "2016-12-22",
+        "dias": 61
+      },
+      {
+        "inicio": "2016-12-24",
+        "fin": "2017-01-04",
+        "dias": 12
+      },
+      {
+        "inicio": "2018-09-01",
+        "fin": "2018-09-02",
+        "dias": 2
+      },
+      {
+        "inicio": "2018-09-04",
+        "fin": "2018-09-05",
+        "dias": 2
+      },
+      {
+        "inicio": "2018-09-07",
+        "fin": "2018-09-09",
+        "dias": 3
+      },
+      {
+        "inicio": "2018-09-14",
+        "fin": "2018-09-16",
+        "dias": 3
+      },
+      {
+        "inicio": "2018-09-18",
+        "fin": "2018-09-19",
+        "dias": 2
+      },
+      {
+        "inicio": "2018-09-21",
+        "fin": "2018-09-24",
+        "dias": 4
+      },
+      {
+        "inicio": "2018-09-27",
+        "fin": "2018-09-28",
+        "dias": 2
+      },
+      {
+        "inicio": "2018-10-04",
+        "fin": "2018-10-15",
+        "dias": 12
+      }
+    ],
+    "first_truncated_day": "2018-08-19",
+    "final_descent_start": "2018-08-19",
+    "window": {
+      "inicio": "2017-01-05",
+      "fin": "2018-08-18",
+      "dias": 591,
+      "pedidos": 97687,
+      "ceros": 0
+    },
+    "discarded": {
+      "dias_antes": 123,
+      "dias_despues": 60,
+      "pedidos_antes": 329,
+      "pedidos_despues": 1425
+    },
+    "legacy_window": {
+      "inicio": "2017-01-01",
+      "fin": "2018-08-15",
+      "dias": 592,
+      "pedidos": 96912
+    }
+  },
+  "specification": {
+    "order": [
+      2,
+      1,
+      2
+    ],
+    "seasonal_order": [
+      1,
+      1,
+      1,
+      7
+    ],
+    "transform": "identidad",
+    "exog": true,
+    "nombre": "SARIMA(2,1,2)(1,1,1)[7] · calendario",
+    "procedencia": {
+      "origen": "docs/resultados_demanda/metricas.json",
+      "ganador": "sarimax_elegido",
+      "criterio": "menor MAE relativo al naive estacional, promediado entre orígenes, entre los candidatos que el backend sabe reconstruir y servir con banda",
+      "nombre": "SARIMA(2,1,2)(1,1,1)[7] · calendario",
+      "banda": "calibrada con los errores del backtesting",
+      "evaluacion_completada": "2026-11-23T19:52:40+00:00",
+      "metricas_publicadas": {
+        "mae": 42.67701783021876,
+        "mase": 1.2939128018802792,
+        "rel_mae": 0.8660848145617381,
+        "cobertura_80": 0.75,
+        "baseline_mae": 48.66517857142857,
+        "periodo": "8 ventanas de 28 días, 2018-03-18 a 2018-07-21"
+      }
+    }
+  },
+  "calibration": {
+    "metodo": "cuantiles empíricos del error relativo del backtesting, por bloque del horizonte",
+    "bloque_dias": 7,
+    "horizonte": 90,
+    "origenes": 6,
+    "paso_dias": 28,
+    "primer_origen": "2017-12-04",
+    "ultimo_origen": "2018-04-23",
+    "previstos_bajo_el_suelo": 0,
+    "resumen_por_bloque": [
+      {
+        "bloque": 1,
+        "dias": "1-7",
+        "n": 42,
+        "q10": -0.2011,
+        "q90": 0.4862,
+        "mediana": 0.0505
+      },
+      {
+        "bloque": 2,
+        "dias": "8-14",
+        "n": 42,
+        "q10": -0.2407,
+        "q90": 0.6336,
+        "mediana": -0.0233
+      },
+      {
+        "bloque": 3,
+        "dias": "15-21",
+        "n": 42,
+        "q10": -0.4255,
+        "q90": 0.4034,
+        "mediana": 0.0113
+      },
+      {
+        "bloque": 4,
+        "dias": "22-28",
+        "n": 42,
+        "q10": -0.5245,
+        "q90": 0.2789,
+        "mediana": 0.0026
+      },
+      {
+        "bloque": 5,
+        "dias": "29-35",
+        "n": 42,
+        "q10": -0.5377,
+        "q90": 0.2541,
+        "mediana": -0.106
+      },
+      {
+        "bloque": 6,
+        "dias": "36-42",
+        "n": 42,
+        "q10": -0.325,
+        "q90": 0.1651,
+        "mediana": -0.0987
+      },
+      {
+        "bloque": 7,
+        "dias": "43-49",
+        "n": 42,
+        "q10": -0.3021,
+        "q90": 0.2409,
+        "mediana": -0.1108
+      },
+      {
+        "bloque": 8,
+        "dias": "50-56",
+        "n": 42,
+        "q10": -0.3402,
+        "q90": 0.2311,
+        "mediana": -0.0954
+      },
+      {
+        "bloque": 9,
+        "dias": "57-63",
+        "n": 42,
+        "q10": -0.5376,
+        "q90": 0.366,
+        "mediana": -0.2111
+      },
+      {
+        "bloque": 10,
+        "dias": "64-70",
+        "n": 42,
+        "q10": -0.4945,
+        "q90": 0.1504,
+        "mediana": -0.2047
+      },
+      {
+        "bloque": 11,
+        "dias": "71-77",
+        "n": 42,
+        "q10": -0.4242,
+        "q90": 0.1474,
+        "mediana": -0.2265
+      },
+      {
+        "bloque": 12,
+        "dias": "78-84",
+        "n": 42,
+        "q10": -0.4624,
+        "q90": 0.1965,
+        "mediana": -0.218
+      },
+      {
+        "bloque": 13,
+        "dias": "85-90",
+        "n": 36,
+        "q10": -0.4938,
+        "q90": 0.0052,
+        "mediana": -0.2254
+      }
+    ]
+  },
+  "holdout": {
+    "mae": 60.989476836983854,
+    "rmse": 71.78914812565526,
+    "smape_pct": 24.468205088116672,
+    "bias": -59.84401946945062,
+    "dias": 28,
+    "mase": 1.740052807951715,
+    "rel_mae": 1.2285650010327682,
+    "cobertura_80": 0.75,
+    "baseline_mae": 49.642857142857146,
+    "periodo": "2018-07-22 a 2018-08-18",
+    "convergio": true
+  },
+  "published_metrics": {
+    "mae": 42.67701783021876,
+    "mase": 1.2939128018802792,
+    "rel_mae": 0.8660848145617381,
+    "cobertura_80": 0.75,
+    "baseline_mae": 48.66517857142857,
+    "periodo": "8 ventanas de 28 días, 2018-03-18 a 2018-07-21"
+  },
+  "artifact": {
+    "path": "backend/app/models/demand_model.joblib",
+    "schema": 2,
+    "bytes": 28630,
+    "sha256": "433195681cfa1be618be7b036f183bb5313d5c87063ca18da3977215a7c8825f",
+    "roundtrip": {
+      "tolerancia": 1e-06,
+      "desvio_maximo": {
+        "valor": 0.0,
+        "inferior": 0.0,
+        "superior": 0.0
+      }
+    },
+    "convergio": true
+  },
+  "acceptance": {
+    "nota": "este script mide una sola ventana de 28 días, que no basta para juzgar la precisión: el veredicto vive en docs/resultados_demanda/metricas.json, que promedia varios orígenes. Aquí se publica para poder comparar",
+    "objetivo_rel_mae": 1.0,
+    "rel_mae_holdout": 1.2285650010327682,
+    "cobertura_80_holdout": 0.75,
+    "bate_al_baseline_en_esta_ventana": false
+  },
+  "completed_at_utc": "2026-11-23T19:53:44+00:00",
+  "elapsed_seconds": 4.7
+}

@@ -5,6 +5,63 @@
 ## 1. Panel general
 ## 2. Riesgo de retraso
 ## 3. Demanda de pedidos
+
+**Para qué sirve:** anticipar cuántos pedidos entrarán cada día de las próximas semanas, para dimensionar el almacén,
+el personal de preparación y la contratación de transporte.
+
+**Dónde:** menú lateral → **Pronóstico de demanda** (ruta `/demanda`).
+
+![Pantalla de pronóstico de demanda](evidencia_demanda/inicio-escritorio.png)
+
+### Cómo se usa
+
+1. Mueve el **deslizador de horizonte** para elegir cuántos días quieres pronosticar, entre 7 y 90.
+2. Elige el **nivel de la banda**: 80 % para planificar el caso habitual, 95 % si prefieres cubrirte más.
+3. Pulsa **Aplicar horizonte**. Nada se recalcula mientras arrastras el deslizador: la consulta se lanza al aplicar.
+
+### Cómo leer el resultado
+
+- **Pedidos previstos:** la suma del horizonte completo. Debajo aparece el rango de la banda, que es lo que conviene
+  usar para planificar: *entre X e Y pedidos*.
+- **Promedio diario previsto:** la misma cifra repartida por día.
+- **Error típico del modelo:** cuánto se equivoca el modelo, en pedidos por día, medido sobre días que **no** usó para
+  entrenar. También dice si mejora o no a la regla simple de repetir la última semana.
+- **El gráfico:** la línea gris continua es el histórico real; la discontinua azul, el pronóstico; la franja azul
+  alrededor es la banda de incertidumbre. **Ver datos del gráfico en tabla** abre los mismos valores en una tabla con
+  el mínimo y el máximo previstos de cada día.
+
+![Banda de incertidumbre y tabla](evidencia_demanda/banda-y-tabla-escritorio.png)
+
+### Qué significa la banda
+
+La banda del 80 % quiere decir que, en los días de prueba, el valor real cayó dentro de ella aproximadamente 8 de cada
+10 veces. **No** es el mejor y el peor caso imaginables: es el rango donde cabe esperar que esté la demanda. Si
+planificas con la línea central te quedarás corto la mitad de los días; si planificas con el extremo superior,
+sobrarán recursos casi siempre.
+
+### El pronóstico no empieza hoy
+
+Olist es un **archivo histórico cerrado**: los pedidos llegan hasta agosto de 2018. Por eso el pronóstico arranca el
+día siguiente al último con datos, y la pantalla lo dice explícitamente. No es un fallo ni un reloj mal puesto.
+
+### Avisos
+
+| Lo que ves | Qué significa | Qué hacer |
+|---|---|---|
+| **"Estimación orientativa · Sin modelo entrenado, se repite la última semana"** | Falta el modelo en el servidor, pero el histórico es real | Avisa al administrador (manual de instalación, §4) |
+| **"Datos sintéticos · solo demostración"** | Ni modelo ni datos de Olist: la serie es inventada | No tomar ninguna decisión con esos números |
+| **"Procedencia no confirmada"** | No se pudo consultar el estado del sistema | Reintenta; si persiste, avisa al administrador |
+
+![Vista en el móvil](evidencia_demanda/inicio-movil.png)
+
+### Límites que conviene conocer
+
+- El horizonte llega a 90 días. Más allá no se ofrece porque el histórico no cubre dos años completos y no hay
+  estacionalidad anual que aprender.
+- Los picos comerciales irrepetibles no se pronostican. En el histórico, el Black Friday de 2017 multiplicó por casi
+  ocho la demanda de un día normal, y eso ocurrió **una sola vez**: el modelo sabe qué día cae, pero no cuánto subirá.
+- El detalle completo de cómo se midió todo esto está en `docs/evaluacion_demanda.md`.
+
 ## 4. Clasificación de productos
 
 **Para qué sirve:** proponer la categoría de una prenda o accesorio a partir de su foto, por ejemplo al dar de alta un

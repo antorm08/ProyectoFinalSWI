@@ -49,8 +49,25 @@ export interface DeliveryDurationOutput {
   mae_desarrollo_dias: number;
   mae_agosto_retrospectivo_dias: number;
 }
-export interface ForecastPoint { fecha: string; valor: number; tipo: "historico" | "pronostico" }
-export interface DemandOutput { serie: ForecastPoint[]; modelo_entrenado: boolean }
+export interface ForecastPoint {
+  fecha: string; valor: number; tipo: "historico" | "pronostico";
+  /** Extremos de la banda de incertidumbre; nulos en los puntos históricos. */
+  inferior: number | null; superior: number | null;
+}
+export interface DemandMetrics {
+  mae: number; mase: number;
+  /** MAE relativo a repetir la última semana: por debajo de 1 la bate. */
+  rel_mae: number;
+  cobertura_80: number | null; baseline_mae: number | null; periodo: string;
+}
+export interface DemandOutput {
+  serie: ForecastPoint[]; modelo_entrenado: boolean; modelo: string;
+  nivel_confianza: number | null;
+  /** Último día con datos: el pronóstico empieza al siguiente. */
+  ancla: string | null;
+  ventana: { inicio?: string; fin?: string; dias?: number; pedidos?: number } | null;
+  metricas: DemandMetrics | null;
+}
 export interface ProductScore { categoria: string; confianza: number }
 export interface ProductOutput {
   categoria: string; confianza: number; top3: ProductScore[];
@@ -70,8 +87,8 @@ export const api = {
   predictDelay: (d: DelayInput, signal?: AbortSignal) => request<DelayOutput>("/delay/predict", { ...json(d), signal }),
   predictDeliveryDuration: (d: DeliveryDurationInput, signal?: AbortSignal) =>
     request<DeliveryDurationOutput>("/delay/predict-duration", { ...json(d), signal }),
-  forecast: (horizonte: number, historico = 90, signal?: AbortSignal) =>
-    request<DemandOutput>(`/demand/forecast?horizonte=${horizonte}&historico=${historico}`, { signal }),
+  forecast: (horizonte: number, historico = 90, nivel = 0.8, signal?: AbortSignal) =>
+    request<DemandOutput>(`/demand/forecast?horizonte=${horizonte}&historico=${historico}&nivel=${nivel}`, { signal }),
   classifyProduct: (file: File, signal?: AbortSignal) => {
     const fd = new FormData();
     fd.append("imagen", file);

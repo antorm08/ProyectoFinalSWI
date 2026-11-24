@@ -15,7 +15,7 @@ const modules: { key: string; to: string; title: string; technique: string; desc
   { key: "resumen", to: "/resenas", title: "Resumen de reseñas", technique: "TextRank extractivo", description: "Resume opiniones de clientes.", icon: "text" },
 ];
 const datasets: Record<string, string> = { orders: "Pedidos", items: "Detalle de pedidos", reviews: "Reseñas", products: "Productos", sellers: "Vendedores", customers: "Clientes" };
-const loadForecast = (signal: AbortSignal) => api.forecast(14, 30, signal);
+const loadForecast = (signal: AbortSignal) => api.forecast(14, 30, 0.8, signal);
 
 export default function Dashboard() {
   const system = useSystem();
@@ -31,7 +31,7 @@ export default function Dashboard() {
       <ErrorBox onRetry={forecast.retry}>{forecast.error}</ErrorBox>
       {forecast.loading && <LoadingState label="Consultando demanda…" />}
       {forecast.data && <>
-        <DemandSource trained={forecast.data.modelo_entrenado} />
+        <DemandSource trained={forecast.data.modelo_entrenado} metricas={forecast.data.metricas} nivel={forecast.data.nivel_confianza} />
         <div className="my-3 grid gap-3 md:grid-cols-3">
           <MetricCard label="Pedidos previstos" value={future.length ? number(total) : "—"} detail={`${future.length} días de pronóstico.`} />
           <MetricCard label="Promedio diario" value={future.length ? number(total / future.length, 1) : "—"} detail="Pedidos por día." />

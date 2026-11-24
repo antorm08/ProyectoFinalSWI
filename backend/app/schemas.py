@@ -79,11 +79,42 @@ class ForecastPoint(BaseModel):
     fecha: str
     valor: float
     tipo: str  # "historico" | "pronostico"
+    inferior: float | None = Field(
+        None, description="Extremo inferior de la banda; nulo en los puntos históricos"
+    )
+    superior: float | None = Field(
+        None, description="Extremo superior de la banda; nulo en los puntos históricos"
+    )
+
+
+class DemandMetrics(BaseModel):
+    """Lo que se midió en el holdout reservado. Ver docs/evaluacion_demanda.md."""
+    mae: float = Field(..., description="Error absoluto medio, en pedidos por día")
+    mase: float = Field(..., description="Error escalado; adimensional")
+    rel_mae: float = Field(
+        ..., description="MAE relativo a repetir la última semana; por debajo de 1 la bate"
+    )
+    cobertura_80: float | None = Field(
+        None, description="Proporción de días reales dentro de la banda del 80 %"
+    )
+    baseline_mae: float | None = None
+    periodo: str = Field(..., description="Días evaluados, fuera de muestra")
 
 
 class DemandOutput(BaseModel):
     serie: list[ForecastPoint]
     modelo_entrenado: bool
+    modelo: str = Field("provisional", description="Especificación que produjo el pronóstico")
+    nivel_confianza: float | None = Field(
+        None, ge=0.5, lt=1, description="Nivel nominal de la banda; nulo sin modelo"
+    )
+    ancla: str | None = Field(
+        None, description="Último día con datos: el pronóstico empieza al siguiente"
+    )
+    ventana: dict | None = Field(
+        None, description="Tramo de histórico con el que se entrenó el modelo"
+    )
+    metricas: DemandMetrics | None = None
 
 
 class ProductScore(BaseModel):
